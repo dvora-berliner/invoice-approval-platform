@@ -6,6 +6,9 @@ build/
 .env
 .env.*
 !.env.example
+
+secrets.json
+!secrets.json.example
 *.log
 npm-debug.log*
 

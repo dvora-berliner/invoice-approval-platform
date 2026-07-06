@@ -1,0 +1,31 @@
+apiVersion: dapr.io/v1alpha1
+kind: Resiliency
+metadata:
+  name: default-resiliency
+scopes:
+  - workflow-service
+spec:
+  policies:
+    retries:
+      default-retry:
+        policy: exponential
+        maxRetries: 3
+        maxInterval: 5s
+    timeouts:
+      default-timeout: 10s
+    circuitBreakers:
+      default-cb:
+        maxRequests: 1
+        interval: 30s
+        timeout: 15s
+        trip: consecutiveFailures >= 5
+  targets:
+    apps:
+      decision-service:
+        timeout: default-timeout
+        retry: default-retry
+        circuitBreaker: default-cb
+      payment-service:
+        timeout: default-timeout
+        retry: default-retry
+        circuitBreaker: default-cb

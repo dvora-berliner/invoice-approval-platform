@@ -1,0 +1,278 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-audit}
+      POSTGRES_USER: ${POSTGRES_USER:-approvalflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  placement:
+    image: daprio/dapr:1.14.4
+    command: ["./placement", "-port", "50006"]
+    ports:
+      - "50006:50006"
+
+  scheduler:
+    image: daprio/scheduler:1.14.4
+    command: ["./scheduler", "--port", "50007", "--etcd-data-dir", "/data"]
+    ports:
+      - "50007:50007"
+    volumes:
+      - scheduler-data:/data
+
+  # --- api-gateway ---
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  api-gateway-dapr:
+    image: daprio/daprd:1.14.4
+    command:
+      [
+        "./daprd",
+        "-app-id", "api-gateway",
+        "-app-port", "3000",
+        "-dapr-http-port", "3500",
+        "-dapr-grpc-port", "50001",
+        "-placement-host-address", "placement:50006",
+        "-scheduler-host-address", "scheduler:50007",
+        "-resources-path", "/components",
+        "-enable-app-health-check",
+        "-app-health-check-path", "/healthz"
+      ]
+    volumes:
+      - "./components:/components"
+      - "./secrets.json:/secrets/secrets.json:ro"
+    depends_on:
+      - api-gateway
+      - placement
+      - scheduler
+    network_mode: "service:api-gateway"
+
+  # --- submission-service ---
+  submission-service:
+    build: ./services/submission-service
+    environment:
+      PORT: 3001
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  submission-service-dapr:
+    image: daprio/daprd:1.14.4
+    command:
+      [
+        "./daprd",
+        "-app-id", "submission-service",
+        "-app-port", "3001",
+        "-dapr-http-port", "3500",
+        "-dapr-grpc-port", "50001",
+        "-placement-host-address", "placement:50006",
+        "-scheduler-host-address", "scheduler:50007",
+        "-resources-path", "/components",
+        "-enable-app-health-check",
+        "-app-health-check-path", "/healthz"
+      ]
+    volumes:
+      - "./components:/components"
+      - "./secrets.json:/secrets/secrets.json:ro"
+    depends_on:
+      - submission-service
+      - placement
+      - scheduler
+    network_mode: "service:submission-service"
+
+  # --- decision-service ---
+  decision-service:
+    build: ./services/decision-service
+    environment:
+      PORT: 3002
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      DAPR_HTTP_PORT: ${DAPR_HTTP_PORT:-3500}
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  decision-service-dapr:
+    image: daprio/daprd:1.14.4
+    command:
+      [
+        "./daprd",
+        "-app-id", "decision-service",
+        "-app-port", "3002",
+        "-dapr-http-port", "3500",
+        "-dapr-grpc-port", "50001",
+        "-placement-host-address", "placement:50006",
+        "-scheduler-host-address", "scheduler:50007",
+        "-resources-path", "/components",
+        "-enable-app-health-check",
+        "-app-health-check-path", "/healthz"
+      ]
+    volumes:
+      - "./components:/components"
+      - "./secrets.json:/secrets/secrets.json:ro"
+    depends_on:
+      - decision-service
+      - placement
+      - scheduler
+    network_mode: "service:decision-service"
+
+  # --- workflow-service ---
+  workflow-service:
+    build: ./services/workflow-service
+    environment:
+      PORT: 3003
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  workflow-service-dapr:
+    image: daprio/daprd:1.14.4
+    command:
+      [
+        "./daprd",
+        "-app-id", "workflow-service",
+        "-app-port", "3003",
+        "-dapr-http-port", "3500",
+        "-dapr-grpc-port", "50001",
+        "-placement-host-address", "placement:50006",
+        "-scheduler-host-address", "scheduler:50007",
+        "-resources-path", "/components",
+        "-enable-app-health-check",
+        "-app-health-check-path", "/healthz"
+      ]
+    volumes:
+      - "./components:/components"
+      - "./secrets.json:/secrets/secrets.json:ro"
+    depends_on:
+      - workflow-service
+      - placement
+      - scheduler
+    network_mode: "service:workflow-service"
+
+  # --- payment-service ---
+  payment-service:
+    build: ./services/payment-service
+    environment:
+      PORT: 3004
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3004/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  payment-service-dapr:
+    image: daprio/daprd:1.14.4
+    command:
+      [
+        "./daprd",
+        "-app-id", "payment-service",
+        "-app-port", "3004",
+        "-dapr-http-port", "3500",
+        "-dapr-grpc-port", "50001",
+        "-placement-host-address", "placement:50006",
+        "-scheduler-host-address", "scheduler:50007",
+        "-resources-path", "/components",
+        "-enable-app-health-check",
+        "-app-health-check-path", "/healthz"
+      ]
+    volumes:
+      - "./components:/components"
+      - "./secrets.json:/secrets/secrets.json:ro"
+    depends_on:
+      - payment-service
+      - placement
+      - scheduler
+    network_mode: "service:payment-service"
+
+  # --- audit-service ---
+  audit-service:
+    build: ./services/audit-service
+    environment:
+      PORT: 3005
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-audit}
+      POSTGRES_USER: ${POSTGRES_USER:-approvalflow}
+      DAPR_HTTP_PORT: ${DAPR_HTTP_PORT:-3500}
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3005/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  audit-service-dapr:
+    image: daprio/daprd:1.14.4
+    command:
+      [
+        "./daprd",
+        "-app-id", "audit-service",
+        "-app-port", "3005",
+        "-dapr-http-port", "3500",
+        "-dapr-grpc-port", "50001",
+        "-placement-host-address", "placement:50006",
+        "-scheduler-host-address", "scheduler:50007",
+        "-resources-path", "/components",
+        "-enable-app-health-check",
+        "-app-health-check-path", "/healthz"
+      ]
+    volumes:
+      - "./components:/components"
+      - "./secrets.json:/secrets/secrets.json:ro"
+    depends_on:
+      - audit-service
+      - placement
+      - scheduler
+    network_mode: "service:audit-service"
+
+  # --- ui ---
+  ui:
+    build: ./ui
+    ports:
+      - "8080:80"
+    depends_on:
+      - api-gateway
+
+volumes:
+  redis-data:
+  postgres-data:
+  scheduler-data:
