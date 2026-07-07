@@ -18,3 +18,4 @@ existed) -> Decision (what was chosen) -> Consequences
 - [0008 - Outbox pattern for dual-write consistency](0008-outbox-pattern-for-dual-write-consistency.md)
 - [0009 - Resiliency policies as config, not code](0009-resiliency-policies-as-config-not-code.md)
 - [0010 - Why the bonus hooks are low-cost to add later](0010-bonus-hooks-are-low-cost-to-add-later.md)
+- [0011 - Dapr Workflow SDK reconnect - app-level supervisor](0011-workflow-sdk-reconnect-supervisor.md)
