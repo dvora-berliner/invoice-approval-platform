@@ -26,6 +26,7 @@ services:
 
   scheduler:
     image: daprio/scheduler:1.14.4
+    user: "0:0"
     command: ["./scheduler", "--port", "50007", "--etcd-data-dir", "/data"]
     ports:
       - "50007:50007"
