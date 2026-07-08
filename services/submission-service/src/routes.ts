@@ -1,5 +1,6 @@
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
+import { attachCorrelationId } from "@approvalflow/logging";
 import { computeDedupKey } from "./dedup";
 import { claimDedupKey, getInvoiceRecord, saveInvoiceRecord } from "./dapr";
 import { invoiceSubmissionSchema, type InvoiceRecord } from "./types";
@@ -26,8 +27,9 @@ function statusMessage(status: InvoiceRecord["status"]): string {
   }
 }
 
-async function respondDuplicate(res: Response, existingTrackingId: string): Promise<void> {
+async function respondDuplicate(req: Request, res: Response, existingTrackingId: string): Promise<void> {
   const existingRecord = await getInvoiceRecord<InvoiceRecord>(invoiceKeyOf(existingTrackingId));
+  req.log.info("duplicate submission short-circuited", { trackingId: existingTrackingId });
   res.status(200).json({
     ...existingRecord,
     trackingId: existingTrackingId,
@@ -52,21 +54,22 @@ router.post("/invoices", async (req, res) => {
 
     const claim = await claimDedupKey(dedupKey, invoiceKeyOf, trackingId);
     if (!claim.claimed) {
-      await respondDuplicate(res, claim.existingTrackingId);
+      await respondDuplicate(req, res, claim.existingTrackingId);
       return;
     }
 
-    const record: InvoiceRecord = {
+    const record: InvoiceRecord = attachCorrelationId(req.correlationId, {
       ...submission,
       trackingId,
       status: "pending",
       submittedAt: new Date().toISOString(),
-    };
+    });
     await saveInvoiceRecord(invoiceKeyOf(trackingId), record);
 
+    req.log.info("invoice submitted", { trackingId });
     res.status(202).json({ trackingId });
   } catch (err) {
-    console.error("POST /invoices failed:", err);
+    req.log.error("POST /invoices failed", { error: String(err) });
     res.status(500).json({ error: "Failed to submit invoice" });
   }
 });
@@ -80,7 +83,7 @@ router.get("/invoices/:trackingId/status", async (req, res) => {
     }
     res.status(200).json({ ...record, message: statusMessage(record.status) });
   } catch (err) {
-    console.error("GET /invoices/:trackingId/status failed:", err);
+    req.log.error("GET /invoices/:trackingId/status failed", { error: String(err) });
     res.status(500).json({ error: "Failed to fetch invoice status" });
   }
 });

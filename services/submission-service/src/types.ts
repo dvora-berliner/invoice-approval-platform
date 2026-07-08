@@ -38,4 +38,5 @@ export interface InvoiceRecord extends InvoiceSubmission {
   trackingId: string;
   status: InvoiceStatus;
   submittedAt: string;
+  correlationId: string;
 }

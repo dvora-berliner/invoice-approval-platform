@@ -1,8 +1,11 @@
 import express from "express";
+import { correlationMiddleware } from "@approvalflow/logging";
 
 const app = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 3002;
 const daprHttpPort = process.env.DAPR_HTTP_PORT ? Number(process.env.DAPR_HTTP_PORT) : 3500;
+
+app.use(correlationMiddleware("decision-service"));
 
 async function getSecret(name: string): Promise<string> {
   const res = await fetch(`http://localhost:${daprHttpPort}/v1.0/secrets/local-secrets/${name}`);

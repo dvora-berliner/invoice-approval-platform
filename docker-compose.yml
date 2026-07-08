@@ -35,7 +35,9 @@ services:
 
   # --- api-gateway ---
   api-gateway:
-    build: ./services/api-gateway
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -74,7 +76,9 @@ services:
 
   # --- submission-service ---
   submission-service:
-    build: ./services/submission-service
+    build:
+      context: .
+      dockerfile: services/submission-service/Dockerfile
     environment:
       PORT: 3001
     depends_on:
@@ -111,7 +115,9 @@ services:
 
   # --- decision-service ---
   decision-service:
-    build: ./services/decision-service
+    build:
+      context: .
+      dockerfile: services/decision-service/Dockerfile
     environment:
       PORT: 3002
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
@@ -150,7 +156,9 @@ services:
 
   # --- workflow-service ---
   workflow-service:
-    build: ./services/workflow-service
+    build:
+      context: .
+      dockerfile: services/workflow-service/Dockerfile
     environment:
       PORT: 3003
     depends_on:
@@ -187,7 +195,9 @@ services:
 
   # --- payment-service ---
   payment-service:
-    build: ./services/payment-service
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
     environment:
       PORT: 3004
     depends_on:
@@ -224,7 +234,9 @@ services:
 
   # --- audit-service ---
   audit-service:
-    build: ./services/audit-service
+    build:
+      context: .
+      dockerfile: services/audit-service/Dockerfile
     environment:
       PORT: 3005
       POSTGRES_HOST: postgres
