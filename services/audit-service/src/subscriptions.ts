@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { createLogger, extractCorrelationId } from "@approvalflow/logging";
 
 export const router = Router();
 
@@ -33,6 +34,8 @@ router.post("/events/invoice-submitted", (req, res) => {
     return;
   }
 
-  console.log("audit-service received InvoiceSubmitted event:", event);
+  const correlationId = extractCorrelationId(event) ?? "unknown";
+  const log = createLogger("audit-service", correlationId);
+  log.info("received InvoiceSubmitted event", { trackingId: (event as { trackingId?: string }).trackingId });
   res.status(200).json({ status: "SUCCESS" });
 });

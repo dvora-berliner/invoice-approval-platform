@@ -1,7 +1,10 @@
 import express from "express";
+import { correlationMiddleware } from "@approvalflow/logging";
 
 const app = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 3004;
+
+app.use(correlationMiddleware("payment-service"));
 
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok", service: "payment-service" });
