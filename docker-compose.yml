@@ -215,6 +215,7 @@ services:
       dockerfile: services/payment-service/Dockerfile
     environment:
       PORT: 3004
+      MOCK_PROVIDER_ALLOW_SIMULATION: ${MOCK_PROVIDER_ALLOW_SIMULATION:-true}
     depends_on:
       - redis
     healthcheck:
