@@ -184,7 +184,7 @@ re-executing (M10).
 | Duplicate submission | `submission-service` hashes `(vendor, invoiceNumber, total)`, checked against Dapr state before accepting |
 | Redelivered pub/sub event | Every subscriber (`workflow-service`, `audit-service`) checks a processed-event-id ledger in Dapr state before acting; no-op if already seen |
 | Retried payment call | `payment-service` keys every reserve/execute by an idempotency key (derived from correlation id + step); replays return the stored result |
-| Dual-write (DB write + event publish) | Outbox pattern in `submission-service` and `payment-service`: the state change and the outbox record are written together; a relay publishes from the outbox, so a crash between "write" and "publish" cannot happen |
+| Dual-write (DB write + event publish) | Outbox pattern in `submission-service`: the state change and the outbox record are written together; a relay publishes from the outbox, so a crash between "write" and "publish" cannot happen. `payment-service` has no event of its own to publish - it only answers `workflow-service`'s synchronous calls (§4); `workflow-service` is the one that publishes to `audit-service` |
 
 ---
 
