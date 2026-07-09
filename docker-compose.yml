@@ -7,6 +7,21 @@ services:
     ports:
       - "6379:6379"
 
+  configuration-seed:
+    image: redis:7-alpine
+    depends_on:
+      - redis
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        until redis-cli -h redis ping; do sleep 1; done
+        redis-cli -h redis SET AUTONOMY-CEILING "250||1" NX
+        redis-cli -h redis SET AUTONOMY-CONFIDENCE "0.80||1" NX
+        redis-cli -h redis SET FX-RATES '{"EUR":1.08,"GBP":1.27}||1' NX
+        redis-cli -h redis CONFIG SET notify-keyspace-events KEA
+        echo "configuration-seed: done"
+
   postgres:
     image: postgres:16-alpine
     environment:
