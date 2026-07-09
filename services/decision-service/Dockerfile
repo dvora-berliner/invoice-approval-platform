@@ -3,6 +3,7 @@ FROM ${BASE_IMAGE}
 WORKDIR /app
 
 COPY package.json ./
+COPY policy.md ./policy.md
 COPY packages/logging ./packages/logging
 COPY services/decision-service ./services/decision-service
 RUN npm install --workspace=packages/logging --workspace=services/decision-service
