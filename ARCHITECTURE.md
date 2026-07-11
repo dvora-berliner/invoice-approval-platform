@@ -46,7 +46,7 @@ see ADR.
 
 | Building block | Used for | Requirement |
 |---|---|---|
-| Service invocation (sync) | `workflow-service` → `decision-service`; `workflow-service` → `payment-service`; approver actions → `workflow-service` | M5 |
+| Service invocation (sync) | `workflow-service` → `decision-service`; `workflow-service` → `payment-service`; approver actions → `workflow-service`; `audit-service` → `submission-service` (push `InvoiceRecord.status` on every event it records, closing F2's pull-status loop) | M5 |
 | Pub/Sub (async) | `submission-service` → `InvoiceSubmitted`; all services → `audit-service` (every event, incl. final outcome for notification) | M5, M8 |
 | State store (Redis) | Idempotency keys, workflow instance state, department budgets (optimistic concurrency via ETags), processed-event ledger - **everywhere except `audit-service`**, which uses Postgres directly (§1a) | M5, M10 |
 | Secrets | LLM provider API key, DB/broker credentials - pulled via Dapr Secrets API, never as raw env vars in code | M5 |
@@ -139,6 +139,13 @@ sequenceDiagram
     Audit-->>UI: notify submitter (plain-language reason)
 ```
 
+`Audit-->>UI` above is realized as: `audit-service` synchronously invokes `submission-service`
+(`PATCH /invoices/:id/status`) on every `EscalationCreated` / `InfoRequested` / `DecisionFinalized`
+it records, so `GET /invoices/:id/status` (§3a) always reflects the real, current state with a
+specific reason - not just the `pending` it started as. `GET /notifications/:id` on `audit-service`
+exposes the same lifecycle as a small history, for a future UI/gateway to poll instead of email/SSE
+(no such channel exists in this local, free-tier project).
+
 ---
 
 ## 4. Payment flow with compensation
@@ -182,7 +189,7 @@ re-executing (M10).
 | Scenario | Mechanism |
 |---|---|
 | Duplicate submission | `submission-service` hashes `(vendor, invoiceNumber, total)`, checked against Dapr state before accepting |
-| Redelivered pub/sub event | Every subscriber (`workflow-service`, `audit-service`) checks a processed-event-id ledger in Dapr state before acting; no-op if already seen |
+| Redelivered pub/sub event | `workflow-service` checks a processed-event-id ledger in Dapr state before acting; `audit-service` enforces the same guarantee with a unique index on its own Postgres event log (§1a) instead of Dapr state - no-op / no duplicate row if already seen |
 | Retried payment call | `payment-service` keys every reserve/execute by an idempotency key (derived from correlation id + step); replays return the stored result |
 | Dual-write (DB write + event publish) | Outbox pattern in `submission-service`: the state change and the outbox record are written together; a relay publishes from the outbox, so a crash between "write" and "publish" cannot happen. `payment-service` has no event of its own to publish - it only answers `workflow-service`'s synchronous calls (§4); `workflow-service` is the one that publishes to `audit-service` |
 
