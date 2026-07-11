@@ -46,13 +46,13 @@ see ADR.
 
 | Building block | Used for | Requirement |
 |---|---|---|
-| Service invocation (sync) | `workflow-service` → `decision-service`; `workflow-service` → `payment-service`; approver actions → `workflow-service`; `audit-service` → `submission-service` (push `InvoiceRecord.status` on every event it records, closing F2's pull-status loop) | M5 |
+| Service invocation (sync) | `workflow-service` → `decision-service`; `workflow-service` → `payment-service`; approver actions → `workflow-service`; `audit-service` → `submission-service` (push `InvoiceRecord.status` on every event it records, closing F2's pull-status loop); `api-gateway` → `submission-service` / `workflow-service` / `audit-service` (proxies only the externally-facing routes - never `decision-service`, `payment-service`, or audit-service's internal status-push endpoint) | M5, M6 |
 | Pub/Sub (async) | `submission-service` → `InvoiceSubmitted`; all services → `audit-service` (every event, incl. final outcome for notification) | M5, M8 |
 | State store (Redis) | Idempotency keys, workflow instance state, department budgets (optimistic concurrency via ETags), processed-event ledger - **everywhere except `audit-service`**, which uses Postgres directly (§1a) | M5, M10 |
 | Secrets | LLM provider API key, DB/broker credentials - pulled via Dapr Secrets API, never as raw env vars in code | M5 |
 | Configuration | `policy.md` content + autonomy thresholds (ceiling, confidence) - hot-reloadable without redeploy | M13 |
 | Resiliency policies | Timeout + retry + circuit breaker on every sync invocation (`workflow-service` → `decision-service` / `payment-service`), declared in YAML, not code | M15, (N3-ready) |
-| HTTP middleware (rate-limit) | Applied to `api-gateway`'s Dapr sidecar pipeline via YAML - **verify exact component availability for the pinned Dapr version during setup**; fall back to a small in-process token-bucket middleware if unavailable | M6 |
+| HTTP middleware (rate-limit) | `middleware.http.ratelimit` (20 req/s), wired into `api-gateway`'s sidecar only via a dedicated `Configuration` resource (`-config gateway-pipeline`) - no other sidecar references it. **Runtime behavior not yet confirmed** (needs a live container run); in-process token-bucket is the fallback if this component turns out unavailable on 1.14.4 | M6 |
 
 ---
 
