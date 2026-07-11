@@ -62,4 +62,5 @@ export interface DecisionResult {
   confidence: number;
   citedRules: RuleId[];
   reason: string;
+  appliedCeiling: number;
 }
