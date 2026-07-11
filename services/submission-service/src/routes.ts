@@ -2,20 +2,33 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { attachCorrelationId } from "@approvalflow/logging";
 import { computeDedupKey } from "./dedup";
-import { claimDedupKey, getInvoiceRecord, saveInvoiceRecord } from "./dapr";
-import { invoiceSubmissionSchema, type InvoiceRecord } from "./types";
+import {
+  claimDedupKey,
+  getInvoiceRecord,
+  getInvoiceRecordWithEtag,
+  saveInvoiceRecord,
+  saveInvoiceRecordWithEtag,
+  publishEvent,
+} from "./dapr";
+import {
+  invoiceSubmissionSchema,
+  invoiceStatusUpdateSchema,
+  invoiceSupplementSchema,
+  type InvoiceRecord,
+  type InvoiceStatus,
+} from "./types";
 
 export const router = Router();
 
 const invoiceKeyOf = (trackingId: string) => `invoice:${trackingId}`;
+const TERMINAL_STATUSES: ReadonlySet<InvoiceStatus> = new Set(["paid", "rejected", "payment_failed"]);
+const MAX_ETAG_RETRIES = 5;
 
 // F2: status responses must include a plain-language explanation, not just a status code.
 function statusMessage(status: InvoiceRecord["status"]): string {
   switch (status) {
     case "pending":
       return "Your invoice was received and is awaiting review.";
-    case "auto_approved":
-      return "Your invoice was automatically approved.";
     case "awaiting_approval":
       return "Your invoice needs a human approver's decision.";
     case "rejected":
@@ -81,9 +94,87 @@ router.get("/invoices/:trackingId/status", async (req, res) => {
       res.status(404).json({ error: "No invoice found for this trackingId" });
       return;
     }
-    res.status(200).json({ ...record, message: statusMessage(record.status) });
+    res.status(200).json({ ...record, message: record.reason ?? statusMessage(record.status) });
   } catch (err) {
     req.log.error("GET /invoices/:trackingId/status failed", { error: String(err) });
     res.status(500).json({ error: "Failed to fetch invoice status" });
+  }
+});
+
+// Internal - called by audit-service only, via Dapr service invocation.
+router.patch("/invoices/:trackingId/status", async (req, res) => {
+  const parseResult = invoiceStatusUpdateSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    res.status(400).json({ error: "Invalid status update", details: parseResult.error.flatten() });
+    return;
+  }
+
+  const key = invoiceKeyOf(req.params.trackingId);
+  try {
+    for (let attempt = 0; attempt < MAX_ETAG_RETRIES; attempt++) {
+      const { value: record, etag } = await getInvoiceRecordWithEtag<InvoiceRecord>(key);
+      if (!record) {
+        res.status(404).json({ error: "No invoice found for this trackingId" });
+        return;
+      }
+      // Guards against a reordered redelivery regressing a terminal status.
+      if (TERMINAL_STATUSES.has(record.status) && !TERMINAL_STATUSES.has(parseResult.data.status)) {
+        req.log.warn("ignoring out-of-order status update", {
+          trackingId: req.params.trackingId,
+          current: record.status,
+          attempted: parseResult.data.status,
+        });
+        res.status(200).json({ trackingId: req.params.trackingId, status: record.status });
+        return;
+      }
+      const updated: InvoiceRecord = { ...record, status: parseResult.data.status, reason: parseResult.data.reason };
+      if (await saveInvoiceRecordWithEtag(key, updated, etag)) {
+        req.log.info("invoice status updated", { trackingId: req.params.trackingId, status: parseResult.data.status });
+        res.status(200).json({ trackingId: req.params.trackingId, status: parseResult.data.status });
+        return;
+      }
+    }
+    req.log.error("failed to update invoice status after retries (concurrent contention)", { trackingId: req.params.trackingId });
+    res.status(409).json({ error: "Failed to update invoice status due to concurrent updates" });
+  } catch (err) {
+    req.log.error("PATCH /invoices/:trackingId/status failed", { error: String(err) });
+    res.status(500).json({ error: "Failed to update invoice status" });
+  }
+});
+
+// F5: submitter supplies missing/corrected fields; resumes the paused workflow.
+router.patch("/invoices/:trackingId/supplement", async (req, res) => {
+  const parseResult = invoiceSupplementSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    res.status(400).json({ error: "Invalid supplement", details: parseResult.error.flatten() });
+    return;
+  }
+
+  const key = invoiceKeyOf(req.params.trackingId);
+  try {
+    let saved: InvoiceRecord | undefined;
+    for (let attempt = 0; attempt < MAX_ETAG_RETRIES; attempt++) {
+      const { value: record, etag } = await getInvoiceRecordWithEtag<InvoiceRecord>(key);
+      if (!record) {
+        res.status(404).json({ error: "No invoice found for this trackingId" });
+        return;
+      }
+      const updated: InvoiceRecord = { ...record, ...parseResult.data };
+      if (await saveInvoiceRecordWithEtag(key, updated, etag)) {
+        saved = updated;
+        break;
+      }
+    }
+    if (!saved) {
+      req.log.error("failed to supplement invoice after retries (concurrent contention)", { trackingId: req.params.trackingId });
+      res.status(409).json({ error: "Failed to supplement invoice due to concurrent updates" });
+      return;
+    }
+    await publishEvent("InvoiceSupplemented", { trackingId: req.params.trackingId, correlationId: saved.correlationId, ...parseResult.data });
+    req.log.info("invoice supplemented", { trackingId: req.params.trackingId, fields: Object.keys(parseResult.data) });
+    res.status(202).json({ trackingId: req.params.trackingId });
+  } catch (err) {
+    req.log.error("PATCH /invoices/:trackingId/supplement failed", { error: String(err) });
+    res.status(500).json({ error: "Failed to supplement invoice" });
   }
 });

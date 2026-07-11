@@ -1,6 +1,17 @@
 const DAPR_HTTP_PORT = process.env.DAPR_HTTP_PORT ?? "3500";
 const STATE_STORE = "submission-outbox-statestore"; // scoped to this service, see components/
+const PUBSUB = "pubsub";
 const DAPR_BASE = `http://localhost:${DAPR_HTTP_PORT}/v1.0`;
+export async function publishEvent(topic: string, payload: unknown): Promise<void> {
+  const res = await fetch(`${DAPR_BASE}/publish/${PUBSUB}/${topic}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`Dapr publish to ${topic} failed: ${res.status} ${await res.text()}`);
+  }
+}
 
 export async function getState<T>(key: string): Promise<T | null> {
   const res = await fetch(`${DAPR_BASE}/state/${STATE_STORE}/${key}`);
@@ -15,6 +26,23 @@ export async function getState<T>(key: string): Promise<T | null> {
 export async function getInvoiceRecord<T>(key: string): Promise<T | null> {
   const raw = await getState<string>(key); // pre-stringified on save
   return raw ? (JSON.parse(raw) as T) : null;
+}
+
+export interface RecordWithEtag<T> {
+  value: T | null;
+  etag: string;
+}
+
+export async function getInvoiceRecordWithEtag<T>(key: string): Promise<RecordWithEtag<T>> {
+  const res = await fetch(`${DAPR_BASE}/state/${STATE_STORE}/${key}`);
+  if (res.status !== 200 && res.status !== 204 && res.status !== 404) {
+    throw new Error(`Dapr state get failed: ${res.status} ${await res.text()}`);
+  }
+  const etag = res.headers.get("etag") ?? "";
+  if (res.status !== 200) return { value: null, etag };
+  const raw = await res.text();
+  const inner = raw ? (JSON.parse(raw) as string) : null; // pre-stringified on save
+  return { value: inner ? (JSON.parse(inner) as T) : null, etag };
 }
 
 async function conditionalSave(key: string, value: unknown, etag: string): Promise<boolean> {
@@ -54,6 +82,10 @@ export async function claimDedupKey(
     }
   }
   throw new Error(`Failed to claim dedup key ${dedupKey} after retries`);
+}
+
+export async function saveInvoiceRecordWithEtag(invoiceKey: string, invoiceValue: unknown, etag: string): Promise<boolean> {
+  return conditionalSave(invoiceKey, JSON.stringify(invoiceValue), etag);
 }
 
 export async function saveInvoiceRecord(invoiceKey: string, invoiceValue: unknown): Promise<void> {
