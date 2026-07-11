@@ -38,6 +38,7 @@ export interface DecisionResult {
   citedRules: string[];
   reason: string;
   agentReasoning?: string;
+  appliedCeiling: number;
 }
 
 export const approvalDecisionRequestSchema = z.object({
@@ -55,7 +56,7 @@ export interface ApprovalQueueItem {
   createdAt: string;
 }
 
-export type FinalOutcome = "auto_approved" | "paid" | "rejected" | "payment_failed";
+export type FinalOutcome = "paid" | "rejected" | "payment_failed";
 
 export interface DecisionFinalizedEvent {
   eventType: "DecisionFinalized";
@@ -63,6 +64,8 @@ export interface DecisionFinalizedEvent {
   correlationId?: string;
   outcome: FinalOutcome;
   reason: string;
+  usdAmount: number;
+  appliedCeiling: number;
   approverId?: string;
   citedRules?: string[];
   agentReasoning?: string;
