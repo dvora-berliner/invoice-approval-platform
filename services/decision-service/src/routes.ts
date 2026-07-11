@@ -44,6 +44,7 @@ export function createDecisionRouter(provider: LLMProvider, policyContext: strin
           confidence: 0,
           citedRules: [],
           reason: "AI provider unavailable",
+          appliedCeiling: thresholds.ceiling,
         });
         return;
       }

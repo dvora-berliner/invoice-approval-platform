@@ -26,12 +26,14 @@ import type {
 } from "../types";
 
 // Pure - `now` is always ctx.getCurrentUtcDateTime(), never Date.now().
+// Always carries decision.usdAmount/citedRules/agentReasoning/appliedCeiling - F9/F10 need these on every outcome.
 function finalizedEvent(
   invoice: WorkflowInput,
+  decision: DecisionResult,
   outcome: FinalOutcome,
   reason: string,
   now: Date,
-  extra: Partial<Pick<DecisionFinalizedEvent, "approverId" | "citedRules" | "agentReasoning">> = {}
+  approverId?: string
 ): DecisionFinalizedEvent {
   return {
     eventType: "DecisionFinalized",
@@ -39,8 +41,12 @@ function finalizedEvent(
     correlationId: invoice.correlationId,
     outcome,
     reason,
+    usdAmount: decision.usdAmount,
+    appliedCeiling: decision.appliedCeiling,
+    citedRules: decision.citedRules,
+    agentReasoning: decision.agentReasoning,
+    approverId,
     timestamp: now.toISOString(),
-    ...extra,
   };
 }
 
@@ -50,7 +56,7 @@ export function* invoiceApprovalWorkflow(
   ctx: WorkflowContext,
   input: WorkflowInput
 ): Generator<any, WorkflowResult, any> {
-  const invoice = input;
+  let invoice = input;
   let decision: DecisionResult = yield ctx.callActivity(callDecisionActivity, invoice);
   let approverId: string | undefined;
 
@@ -86,10 +92,11 @@ export function* invoiceApprovalWorkflow(
         topic: "DecisionFinalized",
         payload: finalizedEvent(
           invoice,
+          decision,
           "rejected",
           approvalRequest.reason ?? "Rejected by approver",
           ctx.getCurrentUtcDateTime(),
-          { approverId: approvalRequest.approverId }
+          approvalRequest.approverId
         ),
       });
       return { outcome: "rejected" };
@@ -106,8 +113,9 @@ export function* invoiceApprovalWorkflow(
       };
       yield ctx.callActivity(publishEventActivity, { topic: "InfoRequested", payload: infoRequested });
 
-      // Relayed via routes.ts's /events/invoice-supplemented -> raiseEvent.
-      yield ctx.waitForExternalEvent("InvoiceSupplemented");
+      // Merge the submitter's fields before re-deciding, or F5 would re-run on stale data.
+      const supplement: Partial<WorkflowInput> = yield ctx.waitForExternalEvent("InvoiceSupplemented");
+      invoice = { ...invoice, ...supplement };
       decision = yield ctx.callActivity(callDecisionActivity, invoice);
       continue;
     }
@@ -120,10 +128,7 @@ export function* invoiceApprovalWorkflow(
   if (decision.route === "reject") {
     yield ctx.callActivity(publishEventActivity, {
       topic: "DecisionFinalized",
-      payload: finalizedEvent(invoice, "rejected", decision.reason, ctx.getCurrentUtcDateTime(), {
-        citedRules: decision.citedRules,
-        agentReasoning: decision.agentReasoning,
-      }),
+      payload: finalizedEvent(invoice, decision, "rejected", decision.reason, ctx.getCurrentUtcDateTime()),
     });
     return { outcome: "rejected" };
   }
@@ -146,10 +151,11 @@ export function* invoiceApprovalWorkflow(
         topic: "DecisionFinalized",
         payload: finalizedEvent(
           invoice,
+          decision,
           "rejected",
           `Insufficient department budget (remaining $${reserveResult.remaining ?? 0})`,
           ctx.getCurrentUtcDateTime(),
-          { approverId }
+          approverId
         ),
       });
       return { outcome: "rejected", reason: "insufficient_budget" };
@@ -173,7 +179,7 @@ export function* invoiceApprovalWorkflow(
     if (executeResult.status === "executed") {
       yield ctx.callActivity(publishEventActivity, {
         topic: "DecisionFinalized",
-        payload: finalizedEvent(invoice, "paid", "Payment executed successfully", ctx.getCurrentUtcDateTime(), { approverId }),
+        payload: finalizedEvent(invoice, decision, "paid", "Payment executed successfully", ctx.getCurrentUtcDateTime(), approverId),
       });
       return { outcome: "paid" };
     }
@@ -193,10 +199,11 @@ export function* invoiceApprovalWorkflow(
       topic: "DecisionFinalized",
       payload: finalizedEvent(
         invoice,
+        decision,
         "payment_failed",
         executeResult.error ?? "Payment failed",
         ctx.getCurrentUtcDateTime(),
-        { approverId }
+        approverId
       ),
     });
     return { outcome: "payment_failed" };
@@ -221,10 +228,11 @@ export function* invoiceApprovalWorkflow(
       topic: "DecisionFinalized",
       payload: finalizedEvent(
         invoice,
+        decision,
         "payment_failed",
         `Payment saga failed: ${String(err)}`,
         ctx.getCurrentUtcDateTime(),
-        { approverId }
+        approverId
       ),
     });
     return { outcome: "payment_failed", reason: "saga_exception" };

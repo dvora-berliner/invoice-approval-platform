@@ -37,6 +37,7 @@ export function decideRoute(
       confidence,
       citedRules,
       reason: `Rejected: ${violations.map((v) => v.message).join(" ")}`,
+      appliedCeiling: thresholds.ceiling,
     };
   }
 
@@ -51,6 +52,7 @@ export function decideRoute(
       confidence,
       citedRules,
       reason: `Auto-approved: $${usdAmount.toFixed(2)} within ceiling, confidence ${confidence.toFixed(2)}, policy-compliant.`,
+      appliedCeiling: thresholds.ceiling,
     };
   }
 
@@ -65,5 +67,6 @@ export function decideRoute(
     confidence,
     citedRules,
     reason: `Escalated: ${reasons.join("; ")}`,
+    appliedCeiling: thresholds.ceiling,
   };
 }
