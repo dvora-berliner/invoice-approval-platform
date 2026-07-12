@@ -3,7 +3,7 @@ FROM ${BASE_IMAGE} AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
-COPY tsconfig.json vite.config.ts index.html ./
+COPY tsconfig.json tsconfig.build.json vite.config.ts index.html ./
 COPY src ./src
 RUN npm run build
 
