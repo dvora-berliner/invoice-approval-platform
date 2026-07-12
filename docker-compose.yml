@@ -302,6 +302,12 @@ services:
     depends_on:
       - api-gateway
 
+  # --- test suite (all services + ui, fully mocked - no infra dependency) ---
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+
 volumes:
   redis-data:
   postgres-data:

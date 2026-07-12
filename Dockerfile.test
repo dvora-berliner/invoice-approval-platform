@@ -1,0 +1,12 @@
+ARG BASE_IMAGE=node:20-alpine
+FROM ${BASE_IMAGE}
+WORKDIR /app
+
+COPY package.json vitest.config.ts ./
+COPY packages ./packages
+COPY services ./services
+COPY ui ./ui
+
+RUN npm install
+
+CMD ["npm", "test"]
