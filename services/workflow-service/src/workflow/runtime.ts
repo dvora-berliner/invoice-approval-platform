@@ -7,15 +7,28 @@ import type { WorkflowInput } from "../types";
 
 export const workflowClient = new DaprWorkflowClient();
 
-export async function startWorkflowRuntime(): Promise<void> {
+// ADR-0011: the underlying durabletask-js worker already retries on its own once
+// connected (stream "end" -> 5s backoff -> reconnect, indefinitely) - but its *first*
+// connection attempt throws with no retry if the sidecar isn't listening yet. That
+// cold-start race is the one gap this wraps; an outer supervisor around the whole
+// runtime would duplicate the SDK's own retry loop instead of closing a real gap.
+export async function startWorkflowRuntime(retries = 10, delayMs = 1000): Promise<void> {
   const runtime = new WorkflowRuntime();
   runtime.registerWorkflow(invoiceApprovalWorkflow);
   for (const activity of allActivities) {
     runtime.registerActivity(activity);
   }
-  // start() only awaits the gRPC handshake - the work-item loop itself runs in the
-  // background (see @dapr/dapr's TaskHubGrpcWorker.start), so this resolves quickly.
-  await runtime.start();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      // start() only awaits the gRPC handshake - the work-item loop itself runs in the
+      // background (see @dapr/dapr's TaskHubGrpcWorker.start), so this resolves quickly.
+      await runtime.start();
+      return;
+    } catch (err) {
+      if (attempt >= retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
 }
 
 // A fixed instanceId (trackingId) is this service's §5 "processed-event ledger": a

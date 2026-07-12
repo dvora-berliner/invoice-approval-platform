@@ -21,7 +21,18 @@ describe("getSecret", () => {
   it("throws when the Dapr secret store responds with an error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({}) }));
 
-    await expect(getSecret("gemini-api-key")).rejects.toThrow(/failed to load secret "gemini-api-key"/);
+    await expect(getSecret("gemini-api-key", 1, 0)).rejects.toThrow(/failed to load secret "gemini-api-key"/);
+  });
+
+  it("retries on failure and eventually succeeds", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ "gemini-api-key": "sekrit" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getSecret("gemini-api-key", 3, 0)).resolves.toBe("sekrit");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("uses DAPR_HTTP_PORT from the environment when set", async () => {

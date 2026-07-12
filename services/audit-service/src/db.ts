@@ -75,8 +75,12 @@ export async function insertEvent(
 }
 
 export async function eventsForTrackingOrCorrelation(id: string): Promise<DecisionEventRow[]> {
+  // Cast the TIMESTAMPTZ columns to text - `pg` otherwise returns native Date objects
+  // for them, which silently violates DecisionEventRow's `string` typing (this is the
+  // same type-lie that crashed GET /dashboard; cast here so it can't happen again).
   const result = await getPool().query<DecisionEventRow>(
-    `SELECT * FROM decision_events WHERE tracking_id = $1 OR correlation_id = $1 ORDER BY occurred_at ASC`,
+    `SELECT id, event_type, tracking_id, correlation_id, payload, occurred_at::text, received_at::text
+     FROM decision_events WHERE tracking_id = $1 OR correlation_id = $1 ORDER BY occurred_at ASC`,
     [id]
   );
   return result.rows;

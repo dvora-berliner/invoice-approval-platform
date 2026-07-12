@@ -44,6 +44,21 @@ describe("startWorkflowRuntime", () => {
     }
     expect(runtimeStart).toHaveBeenCalledOnce();
   });
+
+  it("retries the first connection attempt when the sidecar isn't listening yet", async () => {
+    runtimeStart.mockRejectedValueOnce(new Error("ECONNREFUSED")).mockResolvedValueOnce(undefined);
+
+    await startWorkflowRuntime(3, 0);
+
+    expect(runtimeStart).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws once the retries are exhausted", async () => {
+    runtimeStart.mockRejectedValue(new Error("ECONNREFUSED"));
+
+    await expect(startWorkflowRuntime(2, 0)).rejects.toThrow("ECONNREFUSED");
+    expect(runtimeStart).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("startInvoiceWorkflow", () => {

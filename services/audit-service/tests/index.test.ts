@@ -68,20 +68,25 @@ describe("index bootstrap", () => {
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:4000/v1.0/secrets/local-secrets/postgres-password");
   });
 
-  it("throws when the secret store rejects the request", async () => {
-    vi.stubEnv("PORT", "");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeSecretResponse({ ok: false, status: 403 })));
-    vi.doMock("../src/app", () => ({ buildApp: vi.fn() }));
-    vi.doMock("../src/db", () => ({ initPool: vi.fn(), ensureSchema: vi.fn() }));
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+  it(
+    "throws when the secret store rejects the request",
+    async () => {
+      vi.stubEnv("PORT", "");
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeSecretResponse({ ok: false, status: 403 })));
+      vi.doMock("../src/app", () => ({ buildApp: vi.fn() }));
+      vi.doMock("../src/db", () => ({ initPool: vi.fn(), ensureSchema: vi.fn() }));
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
 
-    await import("../src/index");
-    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled());
+      await import("../src/index");
+      // getSecret retries (cold-start protection) before giving up - allow it to exhaust its retries.
+      await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 12000 });
 
-    expect(errorSpy).toHaveBeenCalledWith("audit-service failed to start", expect.any(Error));
-    expect(exitSpy).toHaveBeenCalledWith(1);
-  });
+      expect(errorSpy).toHaveBeenCalledWith("audit-service failed to start", expect.any(Error));
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    },
+    15000
+  );
 
   it("logs and exits when ensureSchema fails", async () => {
     vi.stubEnv("PORT", "");
