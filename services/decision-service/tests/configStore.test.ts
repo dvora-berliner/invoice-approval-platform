@@ -93,3 +93,23 @@ describe("loadFxRates", () => {
     await expect(loadFxRates()).resolves.toEqual(FALLBACK_FX_RATES);
   });
 });
+
+describe("loadPolicyContext", () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock("fs");
+  });
+
+  it("reads policy.md fresh on every call (F7 - no startup-only caching)", async () => {
+    vi.resetModules();
+    const readFileSync = vi.fn().mockReturnValueOnce("v1").mockReturnValueOnce("v2");
+    vi.doMock("fs", () => ({ readFileSync }));
+
+    const { loadPolicyContext } = await import("../src/policy/configStore");
+
+    expect(loadPolicyContext()).toBe("v1");
+    expect(loadPolicyContext()).toBe("v2");
+    expect(readFileSync).toHaveBeenCalledTimes(2);
+    expect(readFileSync).toHaveBeenCalledWith(expect.stringContaining("policy.md"), "utf-8");
+  });
+});

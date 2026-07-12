@@ -27,7 +27,7 @@ beforeEach(() => {
 
 describe("GET /healthz", () => {
   it("reports ok", async () => {
-    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), "policy");
+    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), () => "policy");
     const res = await request(app).get("/healthz");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: "ok", service: "decision-service" });
@@ -36,7 +36,7 @@ describe("GET /healthz", () => {
 
 describe("POST /decide", () => {
   it("rejects an invalid invoice with 400", async () => {
-    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), "policy");
+    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), () => "policy");
     const res = await request(app).post("/decide").send({ vendor: "" });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("Invalid invoice");
@@ -44,7 +44,7 @@ describe("POST /decide", () => {
 
   it("returns 400 for an unsupported currency", async () => {
     loadFxRatesMock.mockResolvedValue({ USD: 1 });
-    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), "policy");
+    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), () => "policy");
 
     const res = await request(app).post("/decide").send({ ...validInvoice, currency: "XYZ" });
 
@@ -53,7 +53,7 @@ describe("POST /decide", () => {
   });
 
   it("escalates to human_review when the LLM provider fails", async () => {
-    const app = buildApp(fakeProvider(async () => Promise.reject(new Error("provider down"))), "policy");
+    const app = buildApp(fakeProvider(async () => Promise.reject(new Error("provider down"))), () => "policy");
 
     const res = await request(app).post("/decide").send(validInvoice);
 
@@ -71,7 +71,7 @@ describe("POST /decide", () => {
   it("auto-approves a compliant invoice and includes the agent's reasoning", async () => {
     const app = buildApp(
       fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 0.95, citedRules: [], reasoning: "all good" })),
-      "policy",
+      () => "policy",
     );
 
     const res = await request(app).post("/decide").send({ ...validInvoice, receiptPresent: true });
@@ -89,7 +89,7 @@ describe("POST /decide", () => {
         citedRules: ["MEAL-02"],
         reasoning: "no client name found",
       })),
-      "policy",
+      () => "policy",
     );
 
     const res = await request(app).post("/decide").send({ ...validInvoice, category: "meals" });
@@ -101,7 +101,7 @@ describe("POST /decide", () => {
 
   it("returns 500 when an unexpected error occurs after FX conversion", async () => {
     loadThresholdsMock.mockRejectedValue(new Error("boom"));
-    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), "policy");
+    const app = buildApp(fakeProvider(async () => ({ recommendedRoute: "auto_approve", confidence: 1, citedRules: [], reasoning: "" })), () => "policy");
 
     const res = await request(app).post("/decide").send(validInvoice);
 
