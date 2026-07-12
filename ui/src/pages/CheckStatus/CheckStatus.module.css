@@ -1,0 +1,79 @@
+.page {
+  max-width: 720px;
+}
+
+.eyebrow {
+  color: var(--turquoise-700);
+}
+
+.title {
+  margin-bottom: var(--space-1);
+}
+
+.subtitle {
+  margin-bottom: var(--space-6);
+  font-weight: 400;
+}
+
+.lookupCard {
+  padding: var(--space-6);
+}
+
+.resultCard {
+  padding: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.trackingId {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+}
+
+.lineItemRow {
+  display: flex;
+  justify-content: space-between;
+}
+
+.message {
+  margin-top: var(--space-4);
+}
+
+.reason {
+  color: var(--ink-muted);
+  margin-top: var(--space-1);
+}
+
+.divider {
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: var(--space-3);
+  column-gap: var(--space-6);
+}
+
+@media (min-width: 600px) {
+  .detailGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sectionHeading {
+  margin-bottom: var(--space-2);
+}
+
+.supplementForm {
+  margin-top: var(--space-4);
+}
+
+.fieldLabel {
+  color: var(--ink-muted);
+  display: block;
+}
