@@ -51,8 +51,7 @@ export function ApproverQueue() {
 
   const selected = items?.find((i) => i.trackingId === selectedId) ?? null;
 
-  const decide = async (action: ApprovalAction) => {
-    if (!selected) return;
+  const decide = async (item: ApprovalQueueItem, action: ApprovalAction) => {
     if (!approverId.trim()) {
       setActionResult({ ok: false, message: "Enter your approver id first." });
       return;
@@ -60,7 +59,7 @@ export function ApproverQueue() {
     setBusyAction(action);
     setActionResult(null);
     try {
-      await api.decideApproval(selected.trackingId, {
+      await api.decideApproval(item.trackingId, {
         approverId: approverId.trim(),
         action,
         reason: reason.trim() || undefined,
@@ -205,7 +204,7 @@ export function ApproverQueue() {
                     variant="contained"
                     color="primary"
                     disabled={busyAction !== null}
-                    onClick={() => decide("approve")}
+                    onClick={() => decide(selected, "approve")}
                   >
                     {busyAction === "approve" ? "..." : "Approve"}
                   </Button>
@@ -213,14 +212,14 @@ export function ApproverQueue() {
                     variant="outlined"
                     color="secondary"
                     disabled={busyAction !== null}
-                    onClick={() => decide("reject")}
+                    onClick={() => decide(selected, "reject")}
                   >
                     {busyAction === "reject" ? "..." : "Reject"}
                   </Button>
                   <Button
                     variant="text"
                     disabled={busyAction !== null}
-                    onClick={() => decide("request_info")}
+                    onClick={() => decide(selected, "request_info")}
                   >
                     {busyAction === "request_info" ? "..." : "Request info"}
                   </Button>
