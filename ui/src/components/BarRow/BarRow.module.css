@@ -1,0 +1,30 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.label {
+  width: 88px;
+  flex-shrink: 0;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  flex: 1;
+  background-color: var(--turquoise-50);
+  border-radius: var(--radius-sm);
+}
+
+.fill {
+  background-color: var(--turquoise-400);
+  border-radius: var(--radius-sm);
+  height: 18px;
+}
+
+.value {
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}

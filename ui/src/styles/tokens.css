@@ -1,0 +1,31 @@
+:root {
+  --turquoise-900: #06282a;
+  --turquoise-800: #0b3b3e;
+  --turquoise-700: #0f4f52;
+  --turquoise-600: #13656a;
+  --turquoise-500: #178a8f;
+  --turquoise-400: #2aabae;
+  --turquoise-300: #5fc4c3;
+  --turquoise-200: #a6deda;
+  --turquoise-100: #dcf0eb;
+  --turquoise-50: #f0f8f6;
+
+  --coral-600: #c1531a;
+  --coral-100: #f7e5df;
+
+  --paper: #fbf8f2;
+  --ink: #1b211f;
+  --ink-muted: #5b655f;
+  --line: rgba(27, 33, 31, 0.12);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+}

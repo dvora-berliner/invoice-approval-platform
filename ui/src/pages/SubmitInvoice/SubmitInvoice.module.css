@@ -1,0 +1,79 @@
+.page {
+  max-width: 760px;
+}
+
+.eyebrow {
+  color: var(--turquoise-700);
+}
+
+.title {
+  margin-bottom: var(--space-1);
+}
+
+.subtitle {
+  margin-bottom: var(--space-6);
+  font-weight: 400;
+}
+
+.formCard {
+  padding: var(--space-6);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.receiptToggle {
+  margin-top: var(--space-2);
+}
+
+.notesField {
+  margin-top: var(--space-4);
+  width: 100%;
+}
+
+.divider {
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-8);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.lineItemEditRow {
+  display: flex;
+  align-items: flex-start;
+}
+
+.trackingRow {
+  display: flex;
+  align-items: center;
+}
+
+.hint {
+  color: var(--ink-muted);
+}
+
+.lineItemRemove {
+  margin-top: var(--space-1);
+}
+
+.resultAlert {
+  margin-top: var(--space-6);
+}
+
+.trackingId {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
