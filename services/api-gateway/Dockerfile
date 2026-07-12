@@ -3,6 +3,7 @@ FROM ${BASE_IMAGE}
 WORKDIR /app
 
 COPY package.json ./
+COPY docs ./docs
 COPY packages/logging ./packages/logging
 COPY services/api-gateway ./services/api-gateway
 RUN npm install --workspace=packages/logging --workspace=services/api-gateway
