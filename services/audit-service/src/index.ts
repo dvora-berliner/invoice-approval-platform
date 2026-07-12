@@ -4,13 +4,22 @@ import { initPool, ensureSchema } from "./db";
 const port = process.env.PORT ? Number(process.env.PORT) : 3005;
 const daprHttpPort = process.env.DAPR_HTTP_PORT ? Number(process.env.DAPR_HTTP_PORT) : 3500;
 
-async function getSecret(name: string): Promise<string> {
-  const res = await fetch(`http://localhost:${daprHttpPort}/v1.0/secrets/local-secrets/${name}`);
-  if (!res.ok) {
-    throw new Error(`failed to load secret "${name}" from Dapr secret store: ${res.status}`);
+// The Dapr sidecar can take a few seconds to bind its HTTP port after this
+// process starts, so a cold-start secret fetch retries instead of failing once.
+async function getSecret(name: string, retries = 10, delayMs = 1000): Promise<string> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(`http://localhost:${daprHttpPort}/v1.0/secrets/local-secrets/${name}`);
+      if (!res.ok) {
+        throw new Error(`failed to load secret "${name}" from Dapr secret store: ${res.status}`);
+      }
+      const body = (await res.json()) as Record<string, string>;
+      return body[name];
+    } catch (err) {
+      if (attempt >= retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
-  const body = (await res.json()) as Record<string, string>;
-  return body[name];
 }
 
 async function main() {
