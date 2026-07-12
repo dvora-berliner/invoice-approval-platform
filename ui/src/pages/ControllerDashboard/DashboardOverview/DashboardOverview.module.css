@@ -1,0 +1,32 @@
+.statGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 600px) {
+  .statGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.chartGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+
+@media (min-width: 900px) {
+  .chartGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.chartCard {
+  padding: var(--space-5);
+}
+
+.chartTitle {
+  margin-bottom: var(--space-3);
+}

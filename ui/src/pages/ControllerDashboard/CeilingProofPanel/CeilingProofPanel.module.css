@@ -1,0 +1,46 @@
+.intro {
+  color: var(--ink-muted);
+  margin-bottom: var(--space-4);
+  max-width: 640px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  max-width: 640px;
+}
+
+.resultCard {
+  padding: var(--space-4);
+}
+
+.resultLabel {
+  color: var(--ink-muted);
+}
+
+.resultChip {
+  margin-top: var(--space-1);
+}
+
+.divider {
+  margin-bottom: var(--space-4);
+  max-width: 640px;
+}
+
+.sectionHeading {
+  margin-bottom: var(--space-3);
+}
+
+.violationsList {
+  max-width: 720px;
+}
+
+.violationCard {
+  padding: var(--space-4);
+}
+
+.violationId {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
