@@ -8,6 +8,7 @@ import type { ApprovalQueueItem, BudgetRecord, DecisionResult, WorkflowInput } f
 // from history, so it must stay deterministic (no direct fetch/Date.now/Math.random).
 
 const approvalItemKeyOf = (trackingId: string) => `approval:${trackingId}`;
+const decisionClaimKeyOf = (trackingId: string) => `decision-claimed:${trackingId}`;
 const budgetKeyOf = (department: string) => `budget:${department}`;
 const QUEUE_INDEX_KEY = "approval-queue-index";
 const MAX_ETAG_RETRIES = 5;
@@ -25,6 +26,10 @@ export interface PersistApprovalItemInput {
 export async function persistApprovalItemActivity(_ctx: WorkflowActivityContext, input: PersistApprovalItemInput): Promise<void> {
   const log = createLogger("workflow-service", input.item.correlationId);
   await saveState(approvalItemKeyOf(input.item.trackingId), input.item);
+  // The routes.ts create-only claim on POST /approvals/:id/decision guards a single
+  // escalation cycle (double-click protection); F5's request_info loop can re-escalate
+  // the same trackingId, so each new cycle needs a fresh claim - reset it here.
+  await deleteState(decisionClaimKeyOf(input.item.trackingId));
 
   for (let attempt = 0; attempt < MAX_ETAG_RETRIES; attempt++) {
     const { value, etag } = await getStateWithEtag<string[]>(QUEUE_INDEX_KEY);

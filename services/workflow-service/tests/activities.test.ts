@@ -77,6 +77,15 @@ describe("persistApprovalItemActivity", () => {
     expect(saveStateWithEtagMock).toHaveBeenCalledWith("approval-queue-index", ["t1"], "");
   });
 
+  it("resets the decision claim so a re-escalated item (F5 request_info loop) can be decided again", async () => {
+    getStateWithEtagMock.mockResolvedValue({ value: null, etag: "" });
+    saveStateWithEtagMock.mockResolvedValue(true);
+
+    await persistApprovalItemActivity(ctx, { item });
+
+    expect(deleteStateMock).toHaveBeenCalledWith("decision-claimed:t1");
+  });
+
   it("does nothing to the index when the trackingId is already present", async () => {
     getStateWithEtagMock.mockResolvedValue({ value: ["t1"], etag: "e1" });
 
