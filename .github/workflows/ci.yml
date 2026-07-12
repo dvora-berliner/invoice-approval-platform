@@ -15,12 +15,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      # Regenerates package-lock.json here (on Linux, matching this runner) before the
-      # strict `npm ci` install - keeps package-lock.json self-healing across platforms
-      # without weakening the deterministic install step itself.
-      - run: npm install --package-lock-only
-
-      - run: npm ci
+      - run: rm -f package-lock.json
+      - run: npm install
 
       - run: npm run build --workspaces --if-present
 
