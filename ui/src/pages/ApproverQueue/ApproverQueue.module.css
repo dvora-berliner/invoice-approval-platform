@@ -1,0 +1,128 @@
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.itemRowSpaced {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+}
+
+.vendorName {
+  font-weight: 700;
+}
+
+.eyebrow {
+  color: var(--turquoise-700);
+}
+
+.title {
+  margin-bottom: var(--space-1);
+}
+
+.subtitle {
+  font-weight: 400;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 340px 1fr;
+  }
+}
+
+.listItem {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.listItemSelected {
+  background-color: var(--turquoise-50);
+}
+
+.listItemId {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.detailCard {
+  padding: var(--space-6);
+}
+
+.trackingId {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+@media (min-width: 600px) {
+  .metaGrid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.divider {
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.sectionHeading {
+  margin-bottom: var(--space-2);
+}
+
+.reasoningBlock {
+  padding: var(--space-3);
+  background-color: var(--paper);
+  margin-bottom: var(--space-3);
+}
+
+.rulesRow {
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.decisionForm {
+  margin-top: var(--space-2);
+}
+
+.timestamp {
+  color: var(--ink-muted);
+  margin-top: var(--space-5);
+}
+
+.fieldLabel {
+  color: var(--ink-muted);
+  display: block;
+}
+
+.empty {
+  padding: var(--space-8);
+  text-align: center;
+}
