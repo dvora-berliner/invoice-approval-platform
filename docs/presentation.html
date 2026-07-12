@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ApprovalFlow: Project Overview</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/white.css" id="theme" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/monokai.css" />
+
+<style>
+  :root {
+    --turq-100: #e0f7f5;
+    --turq-300: #7ce8dd;
+    --turq-400: #2dd4c8;
+    --turq-600: #0f9e93;
+    --turq-800: #0a5f58;
+    --blue-100: #e4edfc;
+    --blue-300: #8fb8f2;
+    --blue-400: #5b93e8;
+    --blue-600: #2f66c9;
+    --blue-800: #1c4088;
+    --ink: #10262a;
+    --paper: #fbfffe;
+  }
+
+  html, body { background: var(--paper); }
+  .reveal { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; color: var(--ink); }
+  .reveal h1, .reveal h2, .reveal h3, .eyebrow { font-family: 'Sora', 'Inter', sans-serif; }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { background: transparent; }
+  .reveal h1, .reveal h2, .reveal h3 { font-weight: 800; letter-spacing: -0.01em; margin-top: 0; }
+  .reveal h1 { color: var(--turq-800); text-shadow: none; }
+  .reveal h2 { color: var(--turq-800); font-size: 1.35em; margin-bottom: 0.3em; }
+  .reveal h3 { color: var(--blue-600); font-size: 0.95em; }
+  .reveal p, .reveal li { font-size: 0.46em; line-height: 1.4; color: var(--ink); }
+  .reveal ul { margin-left: 0.4em; margin-top: 0.2em; margin-bottom: 0.2em; }
+  .reveal section { padding: 10px 26px; box-sizing: border-box; }
+  .reveal .slides section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-y: auto;
+  }
+
+  /* Decorative blurred blobs - fixed behind every slide for visual depth */
+  .bg-decor {
+    position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  }
+  .bg-decor .blob {
+    position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.35;
+  }
+  .bg-decor .b1 { width: 520px; height: 520px; background: var(--turq-300); top: -180px; left: -140px; }
+  .bg-decor .b2 { width: 460px; height: 460px; background: var(--blue-400); bottom: -160px; right: -120px; opacity: 0.22; }
+  .bg-decor .b3 { width: 340px; height: 340px; background: var(--turq-600); top: 40%; right: 8%; opacity: 0.15; }
+
+  .eyebrow {
+    display: inline-block;
+    font-size: 0.28em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--turq-800);
+    background: linear-gradient(90deg, var(--turq-100), #fff);
+    border: 1px solid var(--turq-400);
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .subtitle { font-size: 0.4em; color: #4d6a67; margin-top: 4px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
+
+  .card {
+    background: #ffffff;
+    border: 1px solid #dff2ef;
+    border-top: 3px solid var(--turq-400);
+    border-radius: 14px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 24px -12px rgba(10, 95, 88, 0.25);
+  }
+  .card h3 { margin-top: 0; margin-bottom: 5px; }
+  .card p, .card li { font-size: 0.88em; }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .pill {
+    font-size: 0.36em;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1.5px solid var(--turq-400);
+    color: var(--turq-800);
+    font-weight: 700;
+    box-shadow: 0 4px 10px -6px rgba(10,95,88,0.3);
+  }
+  .pill.done { background: var(--turq-600); border-color: var(--turq-600); color: #fff; }
+  .pill.tone-blue { background: var(--blue-600); border-color: var(--blue-600); color: #fff; }
+
+  .statgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+  .stat {
+    text-align: center; padding: 14px 6px; border-radius: 14px;
+    background: linear-gradient(160deg, #fff, var(--turq-100));
+    border: 1px solid var(--turq-400);
+    box-shadow: 0 8px 20px -12px rgba(10,95,88,0.3);
+  }
+  .stat .num { font-size: 1.3em; font-weight: 800; color: var(--turq-800); display: block; }
+  .stat .label { font-size: 0.34em; color: #4d6a67; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .flow-step {
+    display: flex; align-items: center; gap: 12px; margin: 6px 0;
+    padding: 7px 14px; border-radius: 10px; background: #fff;
+    border: 1px solid #e2f2ef;
+    border-left: 4px solid var(--turq-400);
+    box-shadow: 0 4px 12px -8px rgba(10,95,88,0.25);
+  }
+  .flow-step .n {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--turq-600); color: #fff; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; font-size: 0.5em;
+  }
+  .flow-step p { margin: 0; font-size: 0.8em; }
+
+  table.reqtable { width: 100%; border-collapse: collapse; font-size: 0.44em; }
+  table.reqtable th, table.reqtable td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #dff2ef; }
+  table.reqtable th { color: var(--turq-800); font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em; }
+  .ok { color: var(--turq-800); font-weight: 700; }
+
+  .diagram-box {
+    background: #fff; border-radius: 14px; padding: 30px 16px; max-height: 480px; overflow: auto;
+    border: 1px solid #dff2ef; box-shadow: 0 10px 28px -16px rgba(10,95,88,0.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mermaid { display: inline-block; padding: 40px 60px; }
+  .diagram-box, .diagram-box * { font-family: "trebuchet ms", verdana, arial, sans-serif; }
+  .mermaid svg {
+    height: auto !important;
+    overflow: visible !important;
+    transform: scale(1.7);
+    transform-origin: center center;
+  }
+  .mermaid .nodeLabel, .mermaid foreignObject, .mermaid foreignObject div, .mermaid foreignObject span {
+    overflow: visible !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+  }
+
+  .service-map { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .svc {
+    border-radius: 12px; padding: 10px 14px; background: #fff;
+    border: 1px solid #dff2ef; border-left: 4px solid var(--blue-400);
+    box-shadow: 0 6px 16px -10px rgba(10,95,88,0.25);
+  }
+  .svc .name { font-weight: 800; color: var(--turq-800); font-size: 0.65em; }
+  .svc .role { font-size: 0.46em; color: #4d6a67; margin-top: 3px; }
+
+  .quote {
+    font-size: 0.55em; font-style: italic; color: var(--turq-800);
+    background: linear-gradient(90deg, var(--turq-100), #fff);
+    border-left: 4px solid var(--blue-400); border-radius: 0 10px 10px 0;
+    padding: 8px 16px; margin: 10px 0;
+  }
+
+  .footer-note { position: absolute; bottom: 14px; right: 40px; font-size: 0.3em; color: #7a9995; }
+</style>
+</head>
+<body>
+<div class="bg-decor">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+</div>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- 1: Title -->
+    <section data-transition="zoom">
+      <span class="eyebrow">Capstone · Microservice Architecture + AI Engineering</span>
+      <h1 style="font-size:1.7em; margin-bottom: 0.1em;">Approval<span style="color:var(--blue-600)">Flow</span></h1>
+      <p class="subtitle" style="font-size:0.5em;">An AI-assisted invoice &amp; expense approval platform that auto-approves the<br/>
+      boring 80% and escalates the risky 20%, with a deterministic guarantee<br/>
+      the agent can never overstep.</p>
+      <div class="pill-row" style="margin-top: 16px;">
+        <span class="pill">6 microservices</span>
+        <span class="pill">Dapr</span>
+        <span class="pill">Dapr Workflow</span>
+        <span class="pill">Redis + Postgres</span>
+        <span class="pill">Gemini (swappable)</span>
+        <span class="pill done">513 tests · 100% coverage</span>
+      </div>
+    </section>
+
+    <!-- 2: The Dilemma -->
+    <section>
+      <span class="eyebrow">The Dilemma</span>
+      <h2>How much autonomy is safe to give an AI agent?</h2>
+      <div class="grid2">
+        <div class="card">
+          <h3>The tension</h3>
+          <p>Escalate everything → safe, but a $0 ceiling defeats the product.<br/>
+          Trust the agent fully → fast, but one bad call moves real money.</p>
+        </div>
+        <div class="card">
+          <h3>Our posture</h3>
+          <p>The agent <b>never</b> has the final say. It only produces a recommendation +
+          confidence + cited rules. A separate, deterministic, unit-tested function applies
+          the autonomy ceiling, and it holds <b>provably</b>, even if the agent is forced to
+          recommend approval.</p>
+        </div>
+      </div>
+      <div class="quote">"auto_approve ⟺ amount ≤ ceiling AND confidence ≥ threshold AND policy-compliant AND no hard-stop. Enforced in plain code, not by the LLM."</div>
+    </section>
+
+    <!-- 3: System diagram -->
+    <section>
+      <span class="eyebrow">Architecture</span>
+      <h2>Six independent services, one Dapr mesh</h2>
+      <div class="diagram-box">
+        <div class="mermaid">
+flowchart LR
+    UI[ui] --> GW[gateway]
+    GW --> Sub[submission]
+    GW --> WF[workflow]
+    GW --> Audit[audit]
+    Sub -- Submitted --> WF
+    WF -- invoke --> Dec[decision]
+    WF -- invoke --> Pay[payment]
+    Sub -. events .-> Audit
+    WF -. events .-> Audit
+    Audit -- status --> Sub
+    classDef svc fill:#0f9e93,stroke:#0a5f58,color:#fff;
+    class UI,GW,Sub,WF,Dec,Pay,Audit svc;
+        </div>
+      </div>
+      <p style="text-align:center; margin-top: 8px;">Only <b>api-gateway</b> and <b>ui</b> are reachable from outside Docker. Every service has its own Dapr sidecar and its own container; where it owns data, it also has its own state partition.</p>
+    </section>
+
+    <!-- 4: Service responsibility map -->
+    <section>
+      <span class="eyebrow">Services</span>
+      <h2>Who owns what</h2>
+      <div class="service-map">
+        <div class="svc"><div class="name">api-gateway</div><div class="role">Single external entry point, Dapr rate-limit middleware, Swagger docs at /docs</div></div>
+        <div class="svc"><div class="name">submission-service</div><div class="role">Immediate ack + tracking id, idempotency, outbox → InvoiceSubmitted</div></div>
+        <div class="svc"><div class="name">decision-service</div><div class="role">FX conversion, hard-stop rules, LLM recommendation, deterministic ceiling guard</div></div>
+        <div class="svc"><div class="name">workflow-service</div><div class="role">Dapr Workflow orchestrator: durable pause/resume, budget reservation, payment saga</div></div>
+        <div class="svc"><div class="name">payment-service</div><div class="role">Idempotent reserve, execute, compensate against a mock provider</div></div>
+        <div class="svc"><div class="name">audit-service</div><div class="role">Postgres decision trail, dashboard, ceiling-proof, submitter notifications</div></div>
+      </div>
+    </section>
+
+    <!-- 5: Submit -> Decide flow -->
+    <section>
+      <span class="eyebrow">Request flow · Part 1</span>
+      <h2>Submit → Decide</h2>
+      <div class="flow-step"><div class="n">1</div><p>Submitter POSTs an invoice → <b>202 Accepted + trackingId</b>, immediately. No blocking on processing.</p></div>
+      <div class="flow-step"><div class="n">2</div><p>Content-hash idempotency check (vendor + invoiceNumber + total). An accidental resubmit short-circuits and never pays twice.</p></div>
+      <div class="flow-step"><div class="n">3</div><p>Outbox pattern publishes <code>InvoiceSubmitted</code>. The DB write and the event publish can never split (no crash between write and publish).</p></div>
+      <div class="flow-step"><div class="n">4</div><p>workflow-service invokes decision-service (resiliency policy: retry, timeout, circuit breaker).</p></div>
+      <div class="flow-step"><div class="n">5</div><p>Agent recommends → deterministic router decides: <b>auto_approve</b> / <b>human_review</b> / <b>reject</b>.</p></div>
+    </section>
+
+    <!-- 6: Escalate + resume -->
+    <section>
+      <span class="eyebrow">Request flow · Part 2</span>
+      <h2>Escalate → Human decides → Resume exactly where it paused</h2>
+      <div class="diagram-box">
+        <div class="mermaid">
+sequenceDiagram
+    participant WF as workflow-service
+    participant Approver
+    participant Audit as audit-service
+    WF-)Audit: EscalationCreated
+    Note over WF: paused - durable, survives restart
+    Approver->>WF: approve / reject / request_info
+    alt approve
+        Note over WF: resume, payment saga
+    else reject
+        Note over WF: resume, finalize rejected
+    else request_info
+        WF-)Audit: InfoRequested
+        Approver->>WF: (later) InvoiceSupplemented
+        Note over WF: resume, back to Decide
+    end
+        </div>
+      </div>
+      <p style="text-align:center;">Powered by <b>Dapr Workflow</b>: state survives a service restart between pause and resume (M11).</p>
+    </section>
+
+    <!-- 7: Payment saga -->
+    <section>
+      <span class="eyebrow">Payment flow</span>
+      <h2>Saga with compensation: no orphaned reservations</h2>
+      <div class="diagram-box">
+        <div class="mermaid">
+sequenceDiagram
+    participant WF as workflow-service
+    participant Budget as Dapr State (ETag)
+    participant Pay as payment-service
+    WF->>Budget: reserve(dept, amount)
+    alt budget available
+        Budget-->>WF: reserved
+        WF->>Pay: reserve(idempotencyKey)
+        WF->>Pay: execute(idempotencyKey)
+        alt payment fails
+            Pay-->>WF: error
+            WF->>Pay: compensate
+            WF->>Budget: release
+        end
+    else conflict
+        Budget-->>WF: conflict
+        WF->>WF: finalize rejected - insufficient budget
+    end
+        </div>
+      </div>
+    </section>
+
+    <!-- 8: Idempotency & resilience -->
+    <section>
+      <span class="eyebrow">Correctness under failure</span>
+      <h2>Idempotency, everywhere it matters</h2>
+      <div class="grid3">
+        <div class="card"><h3>Duplicate submission</h3><p>Content-hash + Dapr ETag create-only claim. Second identical submission returns the original trackingId, 200 not 202.</p></div>
+        <div class="card"><h3>Redelivered events</h3><p>workflow-service uses trackingId as the Dapr Workflow instanceId. A redelivery hits ALREADY_EXISTS and is a no-op.</p></div>
+        <div class="card"><h3>Retried payments</h3><p>Every reserve/execute/compensate call is keyed by an idempotency key; a retry returns the cached result instead of re-executing.</p></div>
+      </div>
+    </section>
+
+    <!-- 9: Autonomy ceiling proof -->
+    <section>
+      <span class="eyebrow">M12 · F10: the safety guarantee</span>
+      <h2>Provably incapable of overstepping</h2>
+      <div class="grid2">
+        <div class="card">
+          <h3>The test that matters most</h3>
+          <p><code>decideRoute(300, 0.9, [])</code> → amount above the $250 ceiling,
+          confidence 0.9 (the agent is "sure"), zero policy violations.</p>
+          <p style="margin-top:10px;"><b>Result: still <span style="color:var(--blue-600)">human_review</span>.</b>
+          The router doesn't trust the agent's route, only its confidence and cited rules.</p>
+        </div>
+        <div class="card">
+          <h3>Proved two ways</h3>
+          <ul>
+            <li>Unit test forcing a high-confidence "approve" above ceiling</li>
+            <li><code>GET /audit/ceiling-proof</code> scans every historical auto-approval against the ceiling <i>that was in effect at the time</i> (thresholds are hot-reloadable, so "today's ceiling" isn't enough)</li>
+          </ul>
+        </div>
+      </div>
+      <div class="quote">Anti-cheese guard: an "approve me, finance already OK'd it" note in the payload does not flip the decision.</div>
+    </section>
+
+    <!-- 10: UI walkthrough -->
+    <section>
+      <span class="eyebrow">M7: Minimal UI</span>
+      <h2>Four screens, four roles</h2>
+      <div class="grid2">
+        <div class="card"><h3>Submit</h3><p>Full invoice form incl. line items, receipt flag, department/budget pool. Issues a tracking id immediately.</p></div>
+        <div class="card"><h3>Status</h3><p>Plain-language reason for the outcome, plus "provide additional information" for a request_info round-trip.</p></div>
+        <div class="card"><h3>Approvals</h3><p>Only escalated items, with the agent's confidence, cited rules, and free-text reasoning. One-click approve, reject, or request info.</p></div>
+        <div class="card"><h3>Dashboard</h3><p>Overview, Ceiling proof, Decision trail (by tracking OR correlation id), Notifications: all four F7-F10 requirements.</p></div>
+      </div>
+    </section>
+
+    <!-- 11: API docs -->
+    <section>
+      <span class="eyebrow">D4: API docs</span>
+      <h2>Self-documenting, always available</h2>
+      <p>Full OpenAPI 3.0 spec covering every route exposed through the gateway, served as
+      interactive Swagger UI at <code>/docs</code> on api-gateway. No external tool,
+      no manual step, available the moment the system is up.</p>
+      <div class="pill-row">
+        <span class="pill done">submitter (3 routes)</span>
+        <span class="pill done">approver (3 routes)</span>
+        <span class="pill done">audit (4 routes)</span>
+      </div>
+    </section>
+
+    <!-- 12: Quality bar -->
+    <section>
+      <span class="eyebrow">Code quality &amp; CI</span>
+      <h2>Numbers, not adjectives</h2>
+      <div class="statgrid">
+        <div class="stat"><span class="num">6</span><span class="label">microservices</span></div>
+        <div class="stat"><span class="num">59</span><span class="label">test files</span></div>
+        <div class="stat"><span class="num">513</span><span class="label">tests passing</span></div>
+        <div class="stat"><span class="num">100%</span><span class="label">line/branch coverage</span></div>
+      </div>
+      <p style="text-align:center; margin-top: 24px;">GitHub Actions runs install → build → full test suite on every push.<br/>
+      Structured JSON logs with a correlation id on every line, propagated across every sync call and every published event.</p>
+    </section>
+
+    <!-- 13: Requirement coverage -->
+    <section>
+      <span class="eyebrow">Coverage</span>
+      <h2>Requirement coverage at a glance</h2>
+      <table class="reqtable">
+        <tr><th>Category</th><th>Status</th><th>Notes</th></tr>
+        <tr><td>Functional (F1–F10)</td><td class="ok">10 / 10</td><td>All user stories implemented end-to-end</td></tr>
+        <tr><td>Must-Have (M1–M18)</td><td class="ok">18 / 18</td><td>Incl. CI, tests, README, provable ceiling</td></tr>
+        <tr><td>Nice-to-Have (N1–N6)</td><td>N3 done</td><td>Outbox + resiliency policies ship "for free" from the architecture</td></tr>
+        <tr><td>Dev process (D1–D6)</td><td class="ok">6 / 6</td><td>Architecture, ADRs (12), Git flow, OpenAPI, verification, README</td></tr>
+      </table>
+    </section>
+
+    <!-- 14: Closing -->
+    <section data-transition="zoom">
+      <span class="eyebrow">Thank you</span>
+      <h1 style="font-size:1.4em;">Questions?</h1>
+      <p class="subtitle" style="font-size:0.5em;">docs/PRODUCT-DILEMMA.md: the full autonomy-posture justification<br/>
+      docs/adr/: 12 architecture decision records, one per defendable choice</p>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    themeVariables: { fontSize: '26px' },
+    flowchart: { padding: 25 },
+    sequence: { actorFontSize: 20, messageFontSize: 18, noteFontSize: 18, width: 170, height: 55 }
+  });
+
+  // Rendering while a slide is hidden gives mermaid wrong measurements (0-width
+  // container), baking clipped text into the SVG permanently. Only render a
+  // diagram once its own slide is actually the visible/current one.
+  function renderVisibleDiagrams(slideEl) {
+    if (!slideEl) return;
+    const nodes = Array.from(slideEl.querySelectorAll('.mermaid')).filter((el) => !el.dataset.rendered);
+    if (nodes.length === 0) return;
+    mermaid.run({ nodes })
+      .then(() => { nodes.forEach((el) => { el.dataset.rendered = 'true'; }); })
+      .catch((err) => {
+        console.error('mermaid render failed', err);
+        nodes.forEach((el) => { if (!el.querySelector('svg')) el.textContent = 'Diagram failed to render: ' + err.message; });
+      });
+  }
+
+  const isPrintPdf = /print-pdf/gi.test(window.location.search);
+
+  Reveal.initialize({
+    hash: true,
+    controls: true,
+    progress: true,
+    center: false,
+    transition: 'slide',
+    width: 1100,
+    height: 700,
+    margin: 0.03,
+    minScale: 0.15,
+    maxScale: 1.5,
+    plugins: [ RevealNotes, RevealHighlight ]
+  }).then(() => {
+    if (isPrintPdf) {
+      // print-pdf lays out every slide at once (nothing is "hidden"), so it's
+      // safe - and necessary - to render every diagram immediately instead of
+      // waiting for each slide to become current.
+      document.querySelectorAll('.slides section').forEach(renderVisibleDiagrams);
+    } else {
+      renderVisibleDiagrams(Reveal.getCurrentSlide());
+    }
+  });
+
+  Reveal.on('slidechanged', (event) => {
+    renderVisibleDiagrams(event.currentSlide);
+  });
+</script>
+</body>
+</html>
