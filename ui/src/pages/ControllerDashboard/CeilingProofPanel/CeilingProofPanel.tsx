@@ -13,22 +13,30 @@ import { formatMoney } from "../../../lib/format";
 import type { CeilingProof } from "../../../api/types";
 import styles from "./CeilingProofPanel.module.css";
 
+type LoadState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "ready"; proof: CeilingProof };
+
 export function CeilingProofPanel() {
-  const [proof, setProof] = useState<CeilingProof | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     api
       .getCeilingProof()
-      .then(setProof)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Could not reach audit-service."))
-      .finally(() => setLoading(false));
+      .then((proof) => setState({ status: "ready", proof }))
+      .catch((err) =>
+        setState({
+          status: "error",
+          message: err instanceof ApiError ? err.message : "Could not reach audit-service.",
+        }),
+      );
   }, []);
 
-  if (loading) return <CircularProgress size={24} />;
-  if (error) return <Alert severity="error">{error}</Alert>;
-  if (!proof) return null;
+  if (state.status === "loading") return <CircularProgress size={24} />;
+  if (state.status === "error") return <Alert severity="error">{state.message}</Alert>;
+
+  const { proof } = state;
 
   return (
     <Box>

@@ -122,7 +122,7 @@ router.get("/ceiling-proof", async (req, res) => {
   }
 });
 
-function notificationMessageFor(row: DecisionEventRow): string {
+export function notificationMessageFor(row: DecisionEventRow): string {
   if (row.event_type === "DecisionFinalized") {
     const payload = row.payload as unknown as DecisionFinalizedEvent;
     switch (payload.outcome) {

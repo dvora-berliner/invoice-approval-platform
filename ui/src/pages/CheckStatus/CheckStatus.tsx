@@ -52,8 +52,7 @@ export function CheckStatus() {
     }
   };
 
-  const sendSupplement = async () => {
-    if (!record || !supplementNotes.trim()) return;
+  const sendSupplement = async (record: InvoiceRecord) => {
     setSupplementBusy(true);
     setSupplementResult(null);
     try {
@@ -181,7 +180,7 @@ export function CheckStatus() {
                   variant="contained"
                   size="small"
                   disabled={supplementBusy || !supplementNotes.trim()}
-                  onClick={sendSupplement}
+                  onClick={() => sendSupplement(record)}
                 >
                   {supplementBusy ? "Sending..." : "Send"}
                 </Button>

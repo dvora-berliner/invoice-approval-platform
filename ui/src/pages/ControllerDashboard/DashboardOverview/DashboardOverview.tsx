@@ -15,22 +15,30 @@ function sortedEntries(record: Record<string, number>): Array<[string, number]> 
   return Object.entries(record).sort(([a], [b]) => a.localeCompare(b));
 }
 
+type LoadState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "ready"; stats: DashboardStats };
+
 export function DashboardOverview() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     api
       .getDashboard()
-      .then(setStats)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Could not reach audit-service."))
-      .finally(() => setLoading(false));
+      .then((stats) => setState({ status: "ready", stats }))
+      .catch((err) =>
+        setState({
+          status: "error",
+          message: err instanceof ApiError ? err.message : "Could not reach audit-service.",
+        }),
+      );
   }, []);
 
-  if (loading) return <CircularProgress size={24} />;
-  if (error) return <Alert severity="error">{error}</Alert>;
-  if (!stats) return null;
+  if (state.status === "loading") return <CircularProgress size={24} />;
+  if (state.status === "error") return <Alert severity="error">{state.message}</Alert>;
+
+  const { stats } = state;
 
   return (
     <Box>

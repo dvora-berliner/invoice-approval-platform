@@ -1,48 +1,15 @@
-import express from "express";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { correlationMiddleware } from "@approvalflow/logging";
-import { createDecisionRouter } from "./routes";
-import { GeminiProvider } from "./llm/geminiProvider";
-import { StubProvider } from "./llm/stubProvider";
-import type { LLMProvider } from "./llm/provider";
+import { buildApp } from "./app";
+import { createProvider } from "./providerFactory";
 
-const app = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 3002;
-const daprHttpPort = process.env.DAPR_HTTP_PORT ? Number(process.env.DAPR_HTTP_PORT) : 3500;
 const llmProviderName = process.env.LLM_PROVIDER ?? "stub";
 
-app.use(express.json());
-app.use(correlationMiddleware("decision-service"));
-
-async function getSecret(name: string): Promise<string> {
-  const res = await fetch(`http://localhost:${daprHttpPort}/v1.0/secrets/local-secrets/${name}`);
-  if (!res.ok) {
-    throw new Error(`failed to load secret "${name}" from Dapr secret store: ${res.status}`);
-  }
-  const body = (await res.json()) as Record<string, string>;
-  return body[name];
-}
-
-// Picked once at startup from config - no provider branching elsewhere.
-async function createProvider(): Promise<LLMProvider> {
-  if (llmProviderName === "gemini") {
-    const geminiApiKey = await getSecret("gemini-api-key");
-    console.log(`decision-service: loaded LLM provider secret via Dapr (length ${geminiApiKey.length})`);
-    return new GeminiProvider(geminiApiKey);
-  }
-  return new StubProvider();
-}
-
-app.get("/healthz", (_req, res) => {
-  res.json({ status: "ok", service: "decision-service" });
-});
-
 async function main() {
-  const provider = await createProvider();
+  const provider = await createProvider(llmProviderName);
   const policyContext = readFileSync(join(__dirname, "../../../policy.md"), "utf-8");
-
-  app.use(createDecisionRouter(provider, policyContext));
+  const app = buildApp(provider, policyContext);
 
   app.listen(port, () => {
     console.log(`decision-service listening on port ${port} (LLM_PROVIDER=${llmProviderName})`);
