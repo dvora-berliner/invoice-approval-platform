@@ -1,0 +1,509 @@
+openapi: 3.0.3
+info:
+  title: ApprovalFlow API
+  description: >
+    Invoice & Expense Approval Platform. All requests go through the
+    api-gateway (the single external entry point, per M6) - it proxies to
+    submission-service, workflow-service, and audit-service. decision-service
+    and payment-service are internal-only and are never reachable from here.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:3000
+    description: Local docker compose (api-gateway)
+
+tags:
+  - name: submitter
+    description: F1-F3 - submit and check on an invoice
+  - name: approver
+    description: F4-F6 - the human-in-the-loop escalation queue
+  - name: audit
+    description: F7-F10 - dashboard, ceiling proof, decision trail, notifications
+
+paths:
+  /invoices:
+    post:
+      tags: [submitter]
+      summary: Submit an invoice/expense (F1)
+      description: >
+        Returns immediately with a tracking id (202) - decisioning happens
+        asynchronously. A content-identical resubmission (same vendor +
+        invoiceNumber + total) short-circuits as a duplicate (F3) and
+        returns 200 instead of 202.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceSubmission"
+            example:
+              vendor: Bistro 19
+              invoiceNumber: NW-INV-7781
+              total: 42.0
+              currency: USD
+              category: meals
+              department: engineering-2026Q2
+              submitter: dana.cohen@northwind.example
+              attendees: 1
+              taxAmount: 3.11
+              receiptPresent: true
+              date: "2026-05-12"
+              notes: Solo working lunch.
+              lineItems:
+                - description: Team lunch
+                  quantity: 1
+                  unitPrice: 38.89
+      responses:
+        "202":
+          description: Accepted - new submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitInvoiceResponse"
+        "200":
+          description: Duplicate of an already-processed submission (F3)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitInvoiceResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /invoices/{trackingId}/status:
+    get:
+      tags: [submitter]
+      summary: Check submission status with a plain-language reason (F2)
+      parameters:
+        - $ref: "#/components/parameters/TrackingId"
+      responses:
+        "200":
+          description: Current known state of the invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceRecord"
+        "404":
+          description: No invoice found for this trackingId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /invoices/{trackingId}/supplement:
+    patch:
+      tags: [submitter]
+      summary: Supply missing/corrected fields after a request_info decision (F5)
+      parameters:
+        - $ref: "#/components/parameters/TrackingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceSupplement"
+      responses:
+        "202":
+          description: Accepted - the paused workflow will resume and re-evaluate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitInvoiceResponse"
+        "400":
+          description: Validation error (e.g. no fields supplied)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No invoice found for this trackingId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Concurrent update conflict - retry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /approvals/queue:
+    get:
+      tags: [approver]
+      summary: List only the items escalated for human review (F4, F6)
+      responses:
+        "200":
+          description: Escalation queue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApprovalQueueItem"
+
+  /approvals/{trackingId}:
+    get:
+      tags: [approver]
+      summary: Get a single queued approval item, with the agent's recommendation
+      parameters:
+        - $ref: "#/components/parameters/TrackingId"
+      responses:
+        "200":
+          description: Queued approval item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalQueueItem"
+        "404":
+          description: No pending approval found for this trackingId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /approvals/{trackingId}/decision:
+    post:
+      tags: [approver]
+      summary: Approve, reject, or request more info - one action, workflow resumes (F5)
+      parameters:
+        - $ref: "#/components/parameters/TrackingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecisionRequest"
+            example:
+              approverId: yossi.approver
+              action: approve
+              reason: Within policy, approving.
+      responses:
+        "202":
+          description: Decision recorded, workflow resuming
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalDecisionResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No pending approval found for this trackingId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: This approval has already been decided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /audit/dashboard:
+    get:
+      tags: [audit]
+      summary: Throughput, auto-vs-human rates, money auto-approved vs human-approved (F8)
+      responses:
+        "200":
+          description: Aggregate dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /audit/ceiling-proof:
+    get:
+      tags: [audit]
+      summary: Prove no auto-approval ever exceeded the ceiling in effect at the time (F10)
+      responses:
+        "200":
+          description: Ceiling proof result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CeilingProof"
+
+  /audit/trail/{id}:
+    get:
+      tags: [audit]
+      summary: Full ordered decision trail by tracking id OR correlation id (F9)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: A trackingId or a correlationId
+      responses:
+        "200":
+          description: Ordered event trail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionTrail"
+        "404":
+          description: No decision trail found for this id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /audit/notifications/{trackingId}:
+    get:
+      tags: [audit]
+      summary: Submitter-facing notification history for one tracking id (M8)
+      parameters:
+        - $ref: "#/components/parameters/TrackingId"
+      responses:
+        "200":
+          description: Latest + full notification history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsResponse"
+        "404":
+          description: No notifications found for this trackingId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  parameters:
+    TrackingId:
+      name: trackingId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: 8f2e1c3a-1234-4a5b-9c0d-abcdef123456
+
+  schemas:
+    LineItem:
+      type: object
+      required: [description, quantity, unitPrice]
+      properties:
+        description: { type: string }
+        quantity: { type: number }
+        unitPrice: { type: number }
+
+    InvoiceSubmission:
+      type: object
+      required: [vendor, invoiceNumber, total]
+      properties:
+        vendor: { type: string }
+        invoiceNumber: { type: string }
+        total: { type: number, description: Must be positive }
+        currency: { type: string, example: USD }
+        category: { type: string, example: meals }
+        submitter: { type: string, format: email }
+        department: { type: string, example: engineering-2026Q2 }
+        attendees: { type: number, description: Required in spirit for category=meals (MEAL-01) }
+        lineItems:
+          type: array
+          items: { $ref: "#/components/schemas/LineItem" }
+        taxAmount: { type: number }
+        receiptPresent: { type: boolean }
+        date: { type: string, format: date }
+        notes: { type: string }
+
+    InvoiceSupplement:
+      description: Same shape as InvoiceSubmission but every field optional; at least one required.
+      type: object
+      properties:
+        vendor: { type: string }
+        invoiceNumber: { type: string }
+        total: { type: number }
+        currency: { type: string }
+        category: { type: string }
+        submitter: { type: string }
+        department: { type: string }
+        attendees: { type: number }
+        lineItems:
+          type: array
+          items: { $ref: "#/components/schemas/LineItem" }
+        taxAmount: { type: number }
+        receiptPresent: { type: boolean }
+        date: { type: string }
+        notes: { type: string }
+
+    SubmitInvoiceResponse:
+      type: object
+      required: [trackingId]
+      properties:
+        trackingId: { type: string }
+        duplicateSubmission: { type: boolean }
+        message: { type: string }
+
+    InvoiceRecord:
+      allOf:
+        - $ref: "#/components/schemas/InvoiceSubmission"
+        - type: object
+          required: [trackingId, status, submittedAt, correlationId, message]
+          properties:
+            trackingId: { type: string }
+            status:
+              type: string
+              enum: [pending, awaiting_approval, rejected, paid, payment_failed]
+            submittedAt: { type: string, format: date-time }
+            correlationId: { type: string }
+            reason: { type: string, description: Plain-language explanation (F2) }
+            message: { type: string }
+
+    DecisionResult:
+      type: object
+      required: [route, usdAmount, confidence, citedRules, reason, appliedCeiling]
+      properties:
+        route:
+          type: string
+          enum: [auto_approve, human_review, reject]
+        usdAmount: { type: number }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        citedRules:
+          type: array
+          items: { type: string }
+          example: ["MEAL-01", "GLOBAL-RECEIPT"]
+        reason: { type: string }
+        agentReasoning: { type: string, description: Free-text agent reasoning, not just rule ids }
+        appliedCeiling: { type: number, description: The AUTONOMY-CEILING value in effect at decision time }
+
+    ApprovalQueueItem:
+      type: object
+      required: [trackingId, invoice, decision, createdAt]
+      properties:
+        trackingId: { type: string }
+        correlationId: { type: string }
+        invoice:
+          allOf:
+            - $ref: "#/components/schemas/InvoiceSubmission"
+            - type: object
+              properties:
+                trackingId: { type: string }
+        decision: { $ref: "#/components/schemas/DecisionResult" }
+        createdAt: { type: string, format: date-time }
+
+    ApprovalDecisionRequest:
+      type: object
+      required: [approverId, action]
+      properties:
+        approverId: { type: string, description: Who made the final call (F9) }
+        action:
+          type: string
+          enum: [approve, reject, request_info]
+        reason: { type: string }
+
+    ApprovalDecisionResponse:
+      type: object
+      required: [trackingId, action]
+      properties:
+        trackingId: { type: string }
+        action:
+          type: string
+          enum: [approve, reject, request_info]
+
+    DashboardStats:
+      type: object
+      required:
+        - totalSubmitted
+        - totalEscalated
+        - totalFinalized
+        - autoApproved
+        - humanApproved
+        - rejected
+        - submittedByDay
+        - finalizedByDay
+      properties:
+        totalSubmitted: { type: integer }
+        totalEscalated: { type: integer }
+        totalFinalized: { type: integer }
+        autoApproved:
+          type: object
+          properties:
+            count: { type: integer }
+            usdAmount: { type: number }
+        humanApproved:
+          type: object
+          properties:
+            count: { type: integer }
+            usdAmount: { type: number }
+        rejected: { type: integer }
+        submittedByDay:
+          type: object
+          additionalProperties: { type: integer }
+        finalizedByDay:
+          type: object
+          additionalProperties: { type: integer }
+
+    CeilingProof:
+      type: object
+      required: [currentCeiling, itemsChecked, violations, passed]
+      properties:
+        currentCeiling: { type: number }
+        itemsChecked: { type: integer }
+        violations:
+          type: array
+          items:
+            type: object
+            properties:
+              tracking_id: { type: string }
+              correlation_id: { type: string }
+              payload: { type: object }
+        passed: { type: boolean }
+
+    DecisionEventRow:
+      type: object
+      required: [id, event_type, tracking_id, correlation_id, payload, occurred_at, received_at]
+      properties:
+        id: { type: integer }
+        event_type: { type: string }
+        tracking_id: { type: string }
+        correlation_id: { type: string }
+        payload: { type: object }
+        occurred_at: { type: string, format: date-time }
+        received_at: { type: string, format: date-time }
+
+    DecisionTrail:
+      type: object
+      required: [id, events]
+      properties:
+        id: { type: string }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/DecisionEventRow" }
+
+    NotificationEntry:
+      type: object
+      required: [eventType, occurredAt, message]
+      properties:
+        eventType:
+          type: string
+          enum: [DecisionFinalized, InfoRequested]
+        occurredAt: { type: string, format: date-time }
+        message: { type: string }
+
+    NotificationsResponse:
+      type: object
+      required: [trackingId, latest, history]
+      properties:
+        trackingId: { type: string }
+        latest: { $ref: "#/components/schemas/NotificationEntry" }
+        history:
+          type: array
+          items: { $ref: "#/components/schemas/NotificationEntry" }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        details: { type: object }
