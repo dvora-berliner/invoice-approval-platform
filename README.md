@@ -17,11 +17,21 @@ functions) that are intentionally not built.
 
 ## Demo
 
-- 🎥 Project walkthrough: [`docs/media/demo.mp4`](./docs/media/demo.mp4)
-- ✅ Full test suite passing: [`docs/media/tests-passing.mp4`](./docs/media/tests-passing.mp4)
+🎥 Project walkthrough (screen recording): _link TBD_
 
-*(Add the two recordings under `docs/media/` with these file names — GitHub
-will render them inline on this page once pushed.)*
+📊 Project overview presentation: [`docs/media/presentation.pdf`](./docs/media/presentation.pdf)
+(architecture diagrams, the autonomy-ceiling guarantee, and full requirement coverage -
+renders directly on GitHub, no download needed).
+
+## Screenshots
+
+| Submit an invoice | Approval queue |
+|---|---|
+| ![Submit invoice form](./docs/media/screenshots/submit-invoice.png) | ![Approval queue with agent recommendation and decision panel](./docs/media/screenshots/approval-queue.png) |
+
+| Controller dashboard | Ceiling proof |
+|---|---|
+| ![Dashboard overview: submitted, escalated, auto vs human approved](./docs/media/screenshots/dashboard-overview.png) | ![Ceiling proof: passed, no auto-approval ever exceeded the configured limit](./docs/media/screenshots/ceiling-proof.png) |
 
 ## Architecture
 
