@@ -138,6 +138,10 @@ services:
       PORT: 3002
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       DAPR_HTTP_PORT: ${DAPR_HTTP_PORT:-3500}
+    volumes:
+      # F7: policy.md is read fresh per request (configStore.ts); this mount lets an
+      # edit on the host reach the running container with no rebuild/redeploy.
+      - "./policy.md:/app/policy.md:ro"
     depends_on:
       - redis
     healthcheck:

@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { DEFAULT_THRESHOLDS, type AutonomyThresholds } from "./thresholds";
 import { FALLBACK_FX_RATES, type FxRates } from "./fx";
 
@@ -31,6 +33,13 @@ export async function loadThresholds(): Promise<AutonomyThresholds> {
     console.error("decision-service: failed to load thresholds from Dapr Configuration, using defaults", err);
     return DEFAULT_THRESHOLDS;
   }
+}
+
+// F7: re-read on every call (not cached at module scope) so an edit to policy.md -
+// including one delivered by a live bind-mount replacing the file inside the
+// container - takes effect on the next request with no rebuild/redeploy.
+export function loadPolicyContext(): string {
+  return readFileSync(join(__dirname, "../../../../policy.md"), "utf-8");
 }
 
 export async function loadFxRates(): Promise<FxRates> {

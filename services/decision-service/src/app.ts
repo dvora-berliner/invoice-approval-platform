@@ -3,7 +3,7 @@ import { correlationMiddleware } from "@approvalflow/logging";
 import { createDecisionRouter } from "./routes";
 import type { LLMProvider } from "./llm/provider";
 
-export function buildApp(provider: LLMProvider, policyContext: string): Express {
+export function buildApp(provider: LLMProvider, loadPolicyContext: () => string): Express {
   const app = express();
 
   app.use(express.json());
@@ -13,7 +13,7 @@ export function buildApp(provider: LLMProvider, policyContext: string): Express 
     res.json({ status: "ok", service: "decision-service" });
   });
 
-  app.use(createDecisionRouter(provider, policyContext));
+  app.use(createDecisionRouter(provider, loadPolicyContext));
 
   return app;
 }

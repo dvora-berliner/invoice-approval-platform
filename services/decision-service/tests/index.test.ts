@@ -6,27 +6,30 @@ describe("index bootstrap", () => {
     vi.resetModules();
     vi.doUnmock("../src/app");
     vi.doUnmock("../src/providerFactory");
-    vi.doUnmock("fs");
+    vi.doUnmock("../src/policy/configStore");
     vi.restoreAllMocks();
   });
 
-  it("builds the app with the created provider, reads the policy file, and listens", async () => {
+  it("builds the app with the created provider and the live policy loader, and listens", async () => {
     vi.stubEnv("PORT", "");
     vi.stubEnv("LLM_PROVIDER", "stub");
     const listen = vi.fn((_port: number, cb?: () => void) => cb?.());
     const fakeApp = { listen };
     const buildApp = vi.fn().mockReturnValue(fakeApp);
     const createProvider = vi.fn().mockResolvedValue({ recommend: vi.fn() });
+    const loadPolicyContext = vi.fn().mockReturnValue("policy text");
     vi.doMock("../src/app", () => ({ buildApp }));
     vi.doMock("../src/providerFactory", () => ({ createProvider }));
-    vi.doMock("fs", () => ({ readFileSync: vi.fn().mockReturnValue("policy text") }));
+    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext }));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await import("../src/index");
     await vi.waitFor(() => expect(listen).toHaveBeenCalled());
 
     expect(createProvider).toHaveBeenCalledWith("stub");
-    expect(buildApp).toHaveBeenCalledWith(expect.any(Object), "policy text");
+    // index.ts passes the loader itself (not its result) so a policy.md edit is
+    // picked up on the next request, not just at process startup (F7).
+    expect(buildApp).toHaveBeenCalledWith(expect.any(Object), loadPolicyContext);
     expect(listen).toHaveBeenCalledWith(3002, expect.any(Function));
     expect(logSpy).toHaveBeenCalledWith("decision-service listening on port 3002 (LLM_PROVIDER=stub)");
   });
@@ -38,7 +41,7 @@ describe("index bootstrap", () => {
     const createProvider = vi.fn().mockResolvedValue({ recommend: vi.fn() });
     vi.doMock("../src/app", () => ({ buildApp: vi.fn().mockReturnValue({ listen }) }));
     vi.doMock("../src/providerFactory", () => ({ createProvider }));
-    vi.doMock("fs", () => ({ readFileSync: vi.fn().mockReturnValue("policy text") }));
+    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext: vi.fn() }));
     vi.spyOn(console, "log").mockImplementation(() => {});
 
     await import("../src/index");
@@ -53,7 +56,7 @@ describe("index bootstrap", () => {
     const listen = vi.fn((_port: number, cb?: () => void) => cb?.());
     vi.doMock("../src/app", () => ({ buildApp: vi.fn().mockReturnValue({ listen }) }));
     vi.doMock("../src/providerFactory", () => ({ createProvider: vi.fn().mockResolvedValue({ recommend: vi.fn() }) }));
-    vi.doMock("fs", () => ({ readFileSync: vi.fn().mockReturnValue("policy text") }));
+    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext: vi.fn() }));
     vi.spyOn(console, "log").mockImplementation(() => {});
 
     await import("../src/index");
@@ -69,7 +72,7 @@ describe("index bootstrap", () => {
       createProvider: vi.fn().mockRejectedValue(new Error("secret store unreachable")),
     }));
     vi.doMock("../src/app", () => ({ buildApp: vi.fn() }));
-    vi.doMock("fs", () => ({ readFileSync: vi.fn().mockReturnValue("policy text") }));
+    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext: vi.fn() }));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
 
