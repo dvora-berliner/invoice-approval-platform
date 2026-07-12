@@ -52,10 +52,10 @@ function finalizedEvent(
 
 // ARCHITECTURE.md §3b/§4: decide -> (reject | human_review pause/resume | auto_approve)
 // -> budget reservation + payment saga with compensation.
-export function* invoiceApprovalWorkflow(
+export async function* invoiceApprovalWorkflow(
   ctx: WorkflowContext,
   input: WorkflowInput
-): Generator<any, WorkflowResult, any> {
+): AsyncGenerator<any, WorkflowResult, any> {
   let invoice = input;
   let decision: DecisionResult = yield ctx.callActivity(callDecisionActivity, invoice);
   let approverId: string | undefined;
