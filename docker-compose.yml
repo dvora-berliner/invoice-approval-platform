@@ -77,7 +77,7 @@ services:
         "-placement-host-address", "placement:50006",
         "-scheduler-host-address", "scheduler:50007",
         "-resources-path", "/components",
-        "-config", "gateway-pipeline",
+        "-config", "/components/gateway-pipeline.yaml",
         "-enable-app-health-check",
         "-app-health-check-path", "/healthz"
       ]

@@ -6,7 +6,9 @@ COPY package.json vitest.config.ts ./
 COPY packages ./packages
 COPY services ./services
 COPY ui ./ui
+COPY docs ./docs
 
 RUN npm install
+RUN npm run build --workspace=packages/logging
 
 CMD ["npm", "test"]
