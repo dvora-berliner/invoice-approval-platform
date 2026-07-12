@@ -40,7 +40,7 @@ router.get("/dashboard", async (req, res) => {
        FROM decision_events WHERE event_type = 'InvoiceSubmitted' GROUP BY day ORDER BY day`
     );
     const finalized = await queryRows<FinalizedAggRow>(
-      `SELECT payload, occurred_at FROM decision_events WHERE event_type = 'DecisionFinalized' ORDER BY occurred_at ASC`
+      `SELECT payload, occurred_at::text AS occurred_at FROM decision_events WHERE event_type = 'DecisionFinalized' ORDER BY occurred_at ASC`
     );
 
     let autoApprovedCount = 0;
