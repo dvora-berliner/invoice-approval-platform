@@ -2,7 +2,13 @@ import { Router } from "express";
 import { createLogger, extractCorrelationId } from "@approvalflow/logging";
 import { insertEvent } from "./db";
 import { pushInvoiceStatus } from "./serviceClient";
-import type { DecisionFinalizedEvent, EscalationCreatedEvent, InfoRequestedEvent, InvoiceSubmittedEvent } from "./types";
+import type {
+  DecisionFinalizedEvent,
+  EscalationCreatedEvent,
+  InfoRequestedEvent,
+  InvoiceSubmittedEvent,
+  InvoiceSupplementedEvent,
+} from "./types";
 
 export const router = Router();
 
@@ -12,6 +18,7 @@ router.get("/dapr/subscribe", (_req, res) => {
     { pubsubname: "pubsub", topic: "EscalationCreated", route: "/events/escalation-created" },
     { pubsubname: "pubsub", topic: "InfoRequested", route: "/events/info-requested" },
     { pubsubname: "pubsub", topic: "DecisionFinalized", route: "/events/decision-finalized" },
+    { pubsubname: "pubsub", topic: "InvoiceSupplemented", route: "/events/invoice-supplemented" },
   ]);
 });
 
@@ -123,6 +130,31 @@ router.post("/events/decision-finalized", async (req, res) => {
     res.status(200).json({ status: "SUCCESS" });
   } catch (err) {
     log.error("failed to record DecisionFinalized event", { trackingId: event.trackingId, error: String(err) });
+    res.status(200).json({ status: "RETRY" });
+  }
+});
+
+// F9: without this, a request_info round-trip left a gap in the decision trail -
+// the submitter's supplement never showed up between EscalationCreated and the
+// eventual re-decision. No status push here: workflow-service's re-evaluation is
+// what produces the next EscalationCreated/DecisionFinalized, which pushes status.
+router.post("/events/invoice-supplemented", async (req, res) => {
+  const event = unwrap(req.body) as InvoiceSupplementedEvent | undefined;
+  if (!event || typeof event !== "object" || !event.trackingId) {
+    res.status(200).json({ status: "SUCCESS" });
+    return;
+  }
+
+  const correlationId = resolveCorrelationId(event.trackingId, event.correlationId);
+  const log = createLogger("audit-service", correlationId);
+  try {
+    const id = await insertEvent("InvoiceSupplemented", event.trackingId, correlationId, event, new Date().toISOString());
+    log.info(id ? "recorded InvoiceSupplemented event" : "duplicate InvoiceSupplemented event skipped", {
+      trackingId: event.trackingId,
+    });
+    res.status(200).json({ status: "SUCCESS" });
+  } catch (err) {
+    log.error("failed to record InvoiceSupplemented event", { trackingId: event.trackingId, error: String(err) });
     res.status(200).json({ status: "RETRY" });
   }
 });

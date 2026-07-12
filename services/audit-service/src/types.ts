@@ -44,3 +44,11 @@ export interface InvoiceSubmittedEvent {
   submittedAt: string;
   [key: string]: unknown;
 }
+
+// F9: submitter's response to a request_info decision - no domain timestamp of its
+// own, so it's recorded with the time audit-service received it (see subscriptions.ts).
+export interface InvoiceSupplementedEvent {
+  trackingId: string;
+  correlationId?: string;
+  [key: string]: unknown;
+}

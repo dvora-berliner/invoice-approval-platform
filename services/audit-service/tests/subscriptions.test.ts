@@ -23,10 +23,10 @@ beforeEach(() => {
 });
 
 describe("GET /dapr/subscribe", () => {
-  it("declares all four subscriptions", async () => {
+  it("declares all five subscriptions", async () => {
     const res = await request(app).get("/dapr/subscribe");
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(4);
+    expect(res.body).toHaveLength(5);
   });
 });
 
@@ -237,6 +237,54 @@ describe("POST /events/decision-finalized", () => {
   it("returns RETRY when recording fails", async () => {
     insertEventMock.mockRejectedValue(new Error("db down"));
     const res = await request(app).post("/events/decision-finalized").send({ data: event });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "RETRY" });
+  });
+});
+
+describe("POST /events/invoice-supplemented", () => {
+  const event = { trackingId: "t1", correlationId: "corr-1", notes: "client name: Acme Corp" };
+
+  it("acks (SUCCESS) an event with no trackingId", async () => {
+    const res = await request(app).post("/events/invoice-supplemented").send({ data: {} });
+    expect(res.status).toBe(200);
+    expect(insertEventMock).not.toHaveBeenCalled();
+  });
+
+  it("records the event with no status push (workflow-service's re-decision handles that)", async () => {
+    insertEventMock.mockResolvedValue(1);
+
+    const res = await request(app).post("/events/invoice-supplemented").send({ data: event });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "SUCCESS" });
+    expect(insertEventMock).toHaveBeenCalledWith("InvoiceSupplemented", "t1", "corr-1", event, expect.any(String));
+    expect(pushInvoiceStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("logs a duplicate (no throw) when insertEvent returns null", async () => {
+    insertEventMock.mockResolvedValue(null);
+    const res = await request(app).post("/events/invoice-supplemented").send({ data: event });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "SUCCESS" });
+  });
+
+  it("falls back to trackingId as the correlationId and warns when none is given", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    insertEventMock.mockResolvedValue(1);
+
+    const res = await request(app)
+      .post("/events/invoice-supplemented")
+      .send({ data: { ...event, correlationId: undefined } });
+
+    expect(res.status).toBe(200);
+    expect(insertEventMock).toHaveBeenCalledWith("InvoiceSupplemented", "t1", "t1", expect.anything(), expect.any(String));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("arrived with no correlationId"));
+  });
+
+  it("returns RETRY when recording fails", async () => {
+    insertEventMock.mockRejectedValue(new Error("db down"));
+    const res = await request(app).post("/events/invoice-supplemented").send({ data: event });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: "RETRY" });
   });
