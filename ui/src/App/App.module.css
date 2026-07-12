@@ -1,0 +1,39 @@
+.root {
+  min-height: 100vh;
+  background-color: var(--paper);
+}
+
+.toolbar {
+  gap: var(--space-3);
+}
+
+.wordmark {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.wordmarkAccent {
+  color: var(--turquoise-300);
+}
+
+.tagline {
+  color: var(--turquoise-200);
+}
+
+.tabsBar {
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabsInner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+}
