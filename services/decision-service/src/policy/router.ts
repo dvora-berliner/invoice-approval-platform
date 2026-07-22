@@ -4,6 +4,8 @@ import type { DecisionResult, PolicyViolation, RuleId } from "../types";
 // Violations that reject outright instead of just escalating to a human.
 const REJECT_RULE_IDS = new Set(["MEAL-03"]);
 
+const AGENT_JUDGMENT_RULE_IDS = new Set<RuleId>(["MEAL-02", "MEAL-03", "GLOBAL-FRAUD", "TRAVEL-03"]);
+
 // Unions the agent's citedRules with the deterministic violations, deduped by ruleId.
 export function mergeViolations(
   deterministicViolations: PolicyViolation[],
@@ -13,7 +15,7 @@ export function mergeViolations(
   const merged = [...deterministicViolations];
   const seen = new Set(deterministicViolations.map((v) => v.ruleId));
   for (const ruleId of agentCitedRules) {
-    if (!seen.has(ruleId)) {
+    if (!seen.has(ruleId) && AGENT_JUDGMENT_RULE_IDS.has(ruleId)) {
       merged.push({ ruleId, message: agentReasoning });
       seen.add(ruleId);
     }
