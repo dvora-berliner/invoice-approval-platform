@@ -50,7 +50,7 @@ see ADR.
 | Pub/Sub (async) | `submission-service` → `InvoiceSubmitted`; all services → `audit-service` (every event, incl. final outcome for notification) | M5, M8 |
 | State store (Redis) | Idempotency keys, workflow instance state, department budgets (optimistic concurrency via ETags), processed-event ledger - **everywhere except `audit-service`**, which uses Postgres directly (§1a) | M5, M10 |
 | Secrets | LLM provider API key, DB/broker credentials - pulled via Dapr Secrets API, never as raw env vars in code | M5 |
-| Configuration | `policy.md` content + autonomy thresholds (ceiling, confidence) - hot-reloadable without redeploy | M13 |
+| Configuration | Autonomy thresholds (ceiling, confidence, FX rates) - hot-reloadable without redeploy. `policy.md` content is **not** routed through this building block: it is read from a host bind-mount instead (plain `readFileSync`, live-reload without a Dapr round-trip) - see ADR-0012 for why | M13 |
 | Resiliency policies | Timeout + retry + circuit breaker on every sync invocation (`workflow-service` → `decision-service` / `payment-service`), declared in YAML, not code | M15, (N3-ready) |
 | HTTP middleware (rate-limit) | `middleware.http.ratelimit` (20 req/s), wired into `api-gateway`'s sidecar only via a dedicated `Configuration` resource (`-config gateway-pipeline`) - no other sidecar references it. **Runtime behavior not yet confirmed** (needs a live container run); in-process token-bucket is the fallback if this component turns out unavailable on 1.14.4 | M6 |
 
