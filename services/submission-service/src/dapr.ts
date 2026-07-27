@@ -1,3 +1,5 @@
+import { randomUUID } from "crypto";
+
 const DAPR_HTTP_PORT = process.env.DAPR_HTTP_PORT ?? "3500";
 const STATE_STORE = "submission-outbox-statestore"; // scoped to this service, see components/
 const PUBSUB = "pubsub";
@@ -101,4 +103,75 @@ export async function saveInvoiceRecord(invoiceKey: string, invoiceValue: unknow
   if (!res.ok) {
     throw new Error(`Dapr state transaction failed: ${res.status} ${await res.text()}`);
   }
+}
+
+export interface OutboxEntry {
+  id: string;
+  topic: string;
+  payload: unknown;
+}
+
+const OUTBOX_QUEUE_KEY = "outbox:pending";
+
+export interface OutboxQueueWithEtag {
+  value: OutboxEntry[];
+  etag: string;
+}
+
+export async function getOutboxQueueWithEtag(): Promise<OutboxQueueWithEtag> {
+  const res = await fetch(`${DAPR_BASE}/state/${STATE_STORE}/${OUTBOX_QUEUE_KEY}`);
+  if (res.status !== 200 && res.status !== 204 && res.status !== 404) {
+    throw new Error(`Dapr state get failed: ${res.status} ${await res.text()}`);
+  }
+  const etag = res.headers.get("etag") ?? "";
+  if (res.status !== 200) return { value: [], etag };
+  const text = await res.text();
+  return { value: text ? (JSON.parse(text) as OutboxEntry[]) : [], etag };
+}
+
+export async function saveOutboxQueueWithEtag(queue: OutboxEntry[], etag: string): Promise<boolean> {
+  const res = await fetch(`${DAPR_BASE}/state/${STATE_STORE}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify([{ key: OUTBOX_QUEUE_KEY, value: queue, etag, options: { concurrency: "first-write" } }]),
+  });
+  return res.ok;
+}
+
+// Manual outbox (ARCHITECTURE.md Sec.9's fallback for Dapr's native outbox, which
+// only supports one fixed publish topic per component): the record and the pending
+// event are written in one transaction, so a crash between save and publish can't
+// happen. outboxRelay.ts drains the queue and does the actual publish.
+export async function saveInvoiceRecordWithOutboxEvent(
+  invoiceKey: string,
+  invoiceValue: unknown,
+  invoiceEtag: string,
+  topic: string,
+  eventPayload: unknown
+): Promise<boolean> {
+  const { value: queue, etag: queueEtag } = await getOutboxQueueWithEtag();
+  const nextQueue: OutboxEntry[] = [...queue, { id: randomUUID(), topic, payload: eventPayload }];
+
+  const res = await fetch(`${DAPR_BASE}/state/${STATE_STORE}/transaction`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      operations: [
+        {
+          operation: "upsert",
+          request: {
+            key: invoiceKey,
+            value: JSON.stringify(invoiceValue),
+            etag: invoiceEtag,
+            options: { concurrency: "first-write" },
+          },
+        },
+        {
+          operation: "upsert",
+          request: { key: OUTBOX_QUEUE_KEY, value: nextQueue, etag: queueEtag, options: { concurrency: "first-write" } },
+        },
+      ],
+    }),
+  });
+  return res.ok;
 }

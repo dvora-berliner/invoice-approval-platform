@@ -45,10 +45,12 @@ export interface InvoiceSubmittedEvent {
   [key: string]: unknown;
 }
 
-// F9: submitter's response to a request_info decision - no domain timestamp of its
-// own, so it's recorded with the time audit-service received it (see subscriptions.ts).
+// F9: occurredAt is set by submission-service at write time (not at receipt here),
+// so redelivery dedupes correctly against the (event_type, tracking_id, occurred_at)
+// unique index every other event uses.
 export interface InvoiceSupplementedEvent {
   trackingId: string;
   correlationId?: string;
+  occurredAt: string;
   [key: string]: unknown;
 }

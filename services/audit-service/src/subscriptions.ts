@@ -134,10 +134,8 @@ router.post("/events/decision-finalized", async (req, res) => {
   }
 });
 
-// F9: without this, a request_info round-trip left a gap in the decision trail -
-// the submitter's supplement never showed up between EscalationCreated and the
-// eventual re-decision. No status push here: workflow-service's re-evaluation is
-// what produces the next EscalationCreated/DecisionFinalized, which pushes status.
+// F9: no status push here - workflow-service's re-evaluation produces the next
+// EscalationCreated/DecisionFinalized, which pushes status.
 router.post("/events/invoice-supplemented", async (req, res) => {
   const event = unwrap(req.body) as InvoiceSupplementedEvent | undefined;
   if (!event || typeof event !== "object" || !event.trackingId) {
@@ -148,7 +146,7 @@ router.post("/events/invoice-supplemented", async (req, res) => {
   const correlationId = resolveCorrelationId(event.trackingId, event.correlationId);
   const log = createLogger("audit-service", correlationId);
   try {
-    const id = await insertEvent("InvoiceSupplemented", event.trackingId, correlationId, event, new Date().toISOString());
+    const id = await insertEvent("InvoiceSupplemented", event.trackingId, correlationId, event, event.occurredAt);
     log.info(id ? "recorded InvoiceSupplemented event" : "duplicate InvoiceSupplemented event skipped", {
       trackingId: event.trackingId,
     });

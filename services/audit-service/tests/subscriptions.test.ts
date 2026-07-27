@@ -243,7 +243,12 @@ describe("POST /events/decision-finalized", () => {
 });
 
 describe("POST /events/invoice-supplemented", () => {
-  const event = { trackingId: "t1", correlationId: "corr-1", notes: "client name: Acme Corp" };
+  const event = {
+    trackingId: "t1",
+    correlationId: "corr-1",
+    occurredAt: "2026-01-01T00:00:00.000Z",
+    notes: "client name: Acme Corp",
+  };
 
   it("acks (SUCCESS) an event with no trackingId", async () => {
     const res = await request(app).post("/events/invoice-supplemented").send({ data: {} });
@@ -258,8 +263,18 @@ describe("POST /events/invoice-supplemented", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: "SUCCESS" });
-    expect(insertEventMock).toHaveBeenCalledWith("InvoiceSupplemented", "t1", "corr-1", event, expect.any(String));
+    expect(insertEventMock).toHaveBeenCalledWith("InvoiceSupplemented", "t1", "corr-1", event, event.occurredAt);
     expect(pushInvoiceStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("dedupes a redelivered event by its payload occurredAt, not receipt time", async () => {
+    insertEventMock.mockResolvedValue(1);
+
+    await request(app).post("/events/invoice-supplemented").send({ data: event });
+    await request(app).post("/events/invoice-supplemented").send({ data: event });
+
+    expect(insertEventMock).toHaveBeenNthCalledWith(1, "InvoiceSupplemented", "t1", "corr-1", event, event.occurredAt);
+    expect(insertEventMock).toHaveBeenNthCalledWith(2, "InvoiceSupplemented", "t1", "corr-1", event, event.occurredAt);
   });
 
   it("logs a duplicate (no throw) when insertEvent returns null", async () => {
@@ -278,7 +293,7 @@ describe("POST /events/invoice-supplemented", () => {
       .send({ data: { ...event, correlationId: undefined } });
 
     expect(res.status).toBe(200);
-    expect(insertEventMock).toHaveBeenCalledWith("InvoiceSupplemented", "t1", "t1", expect.anything(), expect.any(String));
+    expect(insertEventMock).toHaveBeenCalledWith("InvoiceSupplemented", "t1", "t1", expect.anything(), event.occurredAt);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("arrived with no correlationId"));
   });
 

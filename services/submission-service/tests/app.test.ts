@@ -7,16 +7,16 @@ vi.mock("../src/dapr", () => ({
   getInvoiceRecordWithEtag: vi.fn(),
   saveInvoiceRecord: vi.fn(),
   saveInvoiceRecordWithEtag: vi.fn(),
-  publishEvent: vi.fn(),
+  saveInvoiceRecordWithOutboxEvent: vi.fn(),
 }));
 
 import {
   claimDedupKey,
   getInvoiceRecord,
   getInvoiceRecordWithEtag,
-  publishEvent,
   saveInvoiceRecord,
   saveInvoiceRecordWithEtag,
+  saveInvoiceRecordWithOutboxEvent,
 } from "../src/dapr";
 import { app } from "../src/app";
 
@@ -25,7 +25,7 @@ const getInvoiceRecordMock = vi.mocked(getInvoiceRecord);
 const getInvoiceRecordWithEtagMock = vi.mocked(getInvoiceRecordWithEtag);
 const saveInvoiceRecordMock = vi.mocked(saveInvoiceRecord);
 const saveInvoiceRecordWithEtagMock = vi.mocked(saveInvoiceRecordWithEtag);
-const publishEventMock = vi.mocked(publishEvent);
+const saveInvoiceRecordWithOutboxEventMock = vi.mocked(saveInvoiceRecordWithOutboxEvent);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -249,7 +249,7 @@ describe("PATCH /invoices/:trackingId/supplement", () => {
     expect(res.status).toBe(404);
   });
 
-  it("saves the supplement and publishes InvoiceSupplemented", async () => {
+  it("saves the record and enqueues InvoiceSupplemented atomically (no direct publish)", async () => {
     getInvoiceRecordWithEtagMock.mockResolvedValue({
       value: {
         trackingId: "t1",
@@ -262,16 +262,18 @@ describe("PATCH /invoices/:trackingId/supplement", () => {
       },
       etag: "etag-1",
     });
-    saveInvoiceRecordWithEtagMock.mockResolvedValue(true);
-    publishEventMock.mockResolvedValue(undefined);
+    saveInvoiceRecordWithOutboxEventMock.mockResolvedValue(true);
 
     const res = await request(app).patch("/invoices/t1/supplement").send({ notes: "more info" });
 
     expect(res.status).toBe(202);
     expect(res.body).toEqual({ trackingId: "t1" });
-    expect(publishEventMock).toHaveBeenCalledWith(
+    expect(saveInvoiceRecordWithOutboxEventMock).toHaveBeenCalledWith(
+      "invoice:t1",
+      expect.objectContaining({ trackingId: "t1", notes: "more info" }),
+      "etag-1",
       "InvoiceSupplemented",
-      expect.objectContaining({ trackingId: "t1", correlationId: "corr-1", notes: "more info" }),
+      expect.objectContaining({ trackingId: "t1", correlationId: "corr-1", notes: "more info", occurredAt: expect.any(String) }),
     );
   });
 
@@ -288,12 +290,11 @@ describe("PATCH /invoices/:trackingId/supplement", () => {
       },
       etag: "etag-1",
     });
-    saveInvoiceRecordWithEtagMock.mockResolvedValue(false);
+    saveInvoiceRecordWithOutboxEventMock.mockResolvedValue(false);
 
     const res = await request(app).patch("/invoices/t1/supplement").send({ notes: "more info" });
 
     expect(res.status).toBe(409);
-    expect(publishEventMock).not.toHaveBeenCalled();
   });
 
   it("returns 500 on an unexpected error", async () => {
