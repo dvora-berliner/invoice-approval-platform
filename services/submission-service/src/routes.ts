@@ -8,7 +8,7 @@ import {
   getInvoiceRecordWithEtag,
   saveInvoiceRecord,
   saveInvoiceRecordWithEtag,
-  publishEvent,
+  saveInvoiceRecordWithOutboxEvent,
 } from "./dapr";
 import {
   invoiceSubmissionSchema,
@@ -160,7 +160,15 @@ router.patch("/invoices/:trackingId/supplement", async (req, res) => {
         return;
       }
       const updated: InvoiceRecord = { ...record, ...parseResult.data };
-      if (await saveInvoiceRecordWithEtag(key, updated, etag)) {
+      // Record update + outbox marker are written atomically (see dapr.ts) so the
+      // relay poller can never publish without the write having landed, or vice versa.
+      const event = {
+        trackingId: req.params.trackingId,
+        correlationId: updated.correlationId,
+        occurredAt: new Date().toISOString(),
+        ...parseResult.data,
+      };
+      if (await saveInvoiceRecordWithOutboxEvent(key, updated, etag, "InvoiceSupplemented", event)) {
         saved = updated;
         break;
       }
@@ -170,7 +178,6 @@ router.patch("/invoices/:trackingId/supplement", async (req, res) => {
       res.status(409).json({ error: "Failed to supplement invoice due to concurrent updates" });
       return;
     }
-    await publishEvent("InvoiceSupplemented", { trackingId: req.params.trackingId, correlationId: saved.correlationId, ...parseResult.data });
     req.log.info("invoice supplemented", { trackingId: req.params.trackingId, fields: Object.keys(parseResult.data) });
     res.status(202).json({ trackingId: req.params.trackingId });
   } catch (err) {

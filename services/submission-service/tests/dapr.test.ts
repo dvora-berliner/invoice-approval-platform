@@ -3,10 +3,13 @@ import {
   claimDedupKey,
   getInvoiceRecord,
   getInvoiceRecordWithEtag,
+  getOutboxQueueWithEtag,
   getState,
   publishEvent,
   saveInvoiceRecord,
   saveInvoiceRecordWithEtag,
+  saveInvoiceRecordWithOutboxEvent,
+  saveOutboxQueueWithEtag,
 } from "../src/dapr";
 
 function fakeResponse(opts: { status: number; text?: string; etag?: string; ok?: boolean }) {
@@ -205,5 +208,111 @@ describe("claimDedupKey", () => {
     await expect(claimDedupKey("dedup:x", invoiceKeyOf, "track-1")).rejects.toThrow(
       /Failed to claim dedup key dedup:x after retries/,
     );
+  });
+});
+
+describe("getOutboxQueueWithEtag", () => {
+  it("returns an empty queue and the etag for a 204", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ status: 204, etag: "etag-1" })));
+    await expect(getOutboxQueueWithEtag()).resolves.toEqual({ value: [], etag: "etag-1" });
+  });
+
+  it("returns an empty queue for a 404 with no etag header", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ status: 404 })));
+    await expect(getOutboxQueueWithEtag()).resolves.toEqual({ value: [], etag: "" });
+  });
+
+  it("parses the queue and etag for a 200", async () => {
+    const queue = [{ id: "e1", topic: "InvoiceSupplemented", payload: { a: 1 } }];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(fakeResponse({ status: 200, text: JSON.stringify(queue), etag: "etag-2" })),
+    );
+    await expect(getOutboxQueueWithEtag()).resolves.toEqual({ value: queue, etag: "etag-2" });
+  });
+
+  it("throws for a non-200/204/404 status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ status: 500, text: "err" })));
+    await expect(getOutboxQueueWithEtag()).rejects.toThrow(/Dapr state get failed: 500/);
+  });
+});
+
+describe("saveOutboxQueueWithEtag", () => {
+  it("returns true when the conditional save succeeds", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ status: 204 })));
+    await expect(saveOutboxQueueWithEtag([], "etag-1")).resolves.toBe(true);
+  });
+
+  it("returns false when the conditional save conflicts", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ status: 409, ok: false })));
+    await expect(saveOutboxQueueWithEtag([], "etag-1")).resolves.toBe(false);
+  });
+});
+
+describe("saveInvoiceRecordWithOutboxEvent", () => {
+  it("writes the record and enqueues the event in a single transaction", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ status: 204, etag: "queue-etag-1" }))
+      .mockResolvedValueOnce(fakeResponse({ status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const ok = await saveInvoiceRecordWithOutboxEvent(
+      "invoice:x",
+      { a: 1 },
+      "invoice-etag-1",
+      "InvoiceSupplemented",
+      { trackingId: "x" },
+    );
+
+    expect(ok).toBe(true);
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toMatch(/\/state\/submission-outbox-statestore\/transaction$/);
+    const body = JSON.parse(init.body as string);
+    expect(body.operations).toHaveLength(2);
+    expect(body.operations[0]).toEqual({
+      operation: "upsert",
+      request: {
+        key: "invoice:x",
+        value: JSON.stringify({ a: 1 }),
+        etag: "invoice-etag-1",
+        options: { concurrency: "first-write" },
+      },
+    });
+    expect(body.operations[1].request.key).toBe("outbox:pending");
+    expect(body.operations[1].request.etag).toBe("queue-etag-1");
+    expect(body.operations[1].request.value).toEqual([
+      { id: expect.any(String), topic: "InvoiceSupplemented", payload: { trackingId: "x" } },
+    ]);
+  });
+
+  it("appends to an existing queue instead of overwriting it", async () => {
+    const existing = [{ id: "e0", topic: "InvoiceSupplemented", payload: { trackingId: "old" } }];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ status: 200, text: JSON.stringify(existing), etag: "queue-etag-1" }))
+      .mockResolvedValueOnce(fakeResponse({ status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await saveInvoiceRecordWithOutboxEvent("invoice:x", { a: 1 }, "invoice-etag-1", "InvoiceSupplemented", {
+      trackingId: "new",
+    });
+
+    const [, init] = fetchMock.mock.calls[1];
+    const body = JSON.parse(init.body as string);
+    expect(body.operations[1].request.value).toHaveLength(2);
+    expect(body.operations[1].request.value[0]).toEqual(existing[0]);
+  });
+
+  it("returns false when the transaction conflicts", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({ status: 204, etag: "queue-etag-1" }))
+      .mockResolvedValueOnce(fakeResponse({ status: 500, ok: false, text: "conflict" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      saveInvoiceRecordWithOutboxEvent("invoice:x", { a: 1 }, "invoice-etag-1", "InvoiceSupplemented", {}),
+    ).resolves.toBe(false);
   });
 });
