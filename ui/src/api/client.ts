@@ -10,6 +10,8 @@ import type {
   NotificationsResponse,
   SubmitInvoiceResponse,
 } from "./types";
+import type { AuthSession, Role } from "../auth/types";
+import { getSession } from "../auth/session";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -25,10 +27,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getSession()?.token;
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
@@ -47,6 +51,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  register: (payload: { username: string; password: string; role: Role }) =>
+    request<AuthSession>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  login: (payload: { username: string; password: string }) =>
+    request<AuthSession>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   submitInvoice: (payload: InvoiceSubmission) =>
     request<SubmitInvoiceResponse>("/invoices", {
       method: "POST",

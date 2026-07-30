@@ -1,0 +1,36 @@
+.page {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.title {
+  margin-bottom: var(--space-1);
+}
+
+.subtitle {
+  margin-bottom: var(--space-6);
+  font-weight: 400;
+}
+
+.formCard {
+  padding: var(--space-6);
+}
+
+.field {
+  width: 100%;
+  margin-bottom: var(--space-6);
+}
+
+.submit {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.toggle {
+  margin-top: var(--space-4);
+  text-align: center;
+}
+
+.resultAlert {
+  margin-top: var(--space-4);
+}

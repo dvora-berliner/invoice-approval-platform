@@ -6,6 +6,7 @@ import swaggerUi from "swagger-ui-express";
 import { parse as parseYaml } from "yaml";
 import { correlationMiddleware } from "@approvalflow/logging";
 import { router } from "./routes";
+import { authRouter } from "./auth/routes";
 
 export const app = express();
 
@@ -16,6 +17,8 @@ app.use(correlationMiddleware("api-gateway"));
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok", service: "api-gateway" });
 });
+
+app.use(authRouter);
 
 // D4: interactive API docs at /docs, generated from docs/openapi.yaml - served here
 // since api-gateway is the single external entry point (M6).

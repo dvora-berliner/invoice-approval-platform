@@ -15,13 +15,13 @@ store + pub/sub broker for all services), **Postgres** (dedicated store for
 
 | Service | Responsibility | Requirements |
 |---|---|---|
-| `api-gateway` | Single external entry point, rate-limiting (Dapr middleware), auth middleware slot | M6, N1-ready |
+| `api-gateway` | Single external entry point, rate-limiting (Dapr middleware), JWT auth + role-based authorization | M6, N1 |
 | `submission-service` | Accepts submissions, returns tracking id immediately, **exposes status query**, idempotency check, outbox-based event publish | F1, F2, F3, M8, M10 |
 | `decision-service` | FX conversion, deterministic hard-stop checks, LLM call via provider ACL, deterministic autonomy-ceiling guard | F4, F6, M12, M13, M15 |
 | `workflow-service` | Orchestrator (Dapr Workflow): drives the full lifecycle, durable HITL pause/resume, budget reservation, payment saga, **persists agent output for the approval queue** | F4, F5, M9, M11 |
 | `payment-service` | Idempotent reserve → execute → compensate against a mock payment provider | M9, M10 |
 | `audit-service` | Subscribes to every domain event; records the full decision trail (**including the agent's free-text reasoning**, not just cited rule ids) in its own Postgres store, exposes ceiling-proof + dashboard queries, **and** notifies the submitter of final outcomes | F2, F8, F9, F10, M8, M14 |
-| `ui` | Submit, check status, approver queue, controller dashboard | M7 |
+| `ui` | Sign in/register, then role-gated console: submit, check status, approver queue, controller dashboard | M7, N1 |
 
 Each service is an independent Node.js process, its own container, its own
 Dapr sidecar, and (where it owns data) its own state partition - no service
@@ -234,7 +234,6 @@ prove the ceiling still holds (M12's requirement).
 
 | Bonus | Hook location |
 |---|---|
-| N1 | `api-gateway` auth middleware slot |
 | N3 | Outbox (§5); resiliency-policy YAML (§2) |
 | N4 | Correlation id propagation (§10) |
 | N5 | `decision-service`'s `getRelevantPolicyContext(invoice)` |
@@ -243,6 +242,29 @@ prove the ceiling still holds (M12's requirement).
 | N2, B3, N6 | No hook needed (purely additive / ongoing practice) |
 
 Rationale for why each of these is low-cost to add later: see ADR.
+
+---
+
+## 8b. Auth & role-based authorization (N1)
+
+`api-gateway` issues self-signed JWTs (`POST /auth/register`,
+`POST /auth/login`); passwords are bcrypt-hashed and stored in the same Dapr
+state store other services use. Every proxied route requires a valid bearer
+token (`authenticate()`), and role-specific actions are additionally gated by
+`requireRole()`:
+
+| Role | Access |
+|---|---|
+| `submitter` | Submit / supplement invoices, check status |
+| `approver` | Check status, work the approval queue (approve / reject / request info) |
+| `admin` | Everything above, plus the audit trail, dashboard, and ceiling-proof endpoints |
+
+The UI mirrors this at the tab level: the tab bar only renders the sections
+the signed-in role is allowed to use.
+
+Simplification (documented, not a production trust model): the role is
+caller-supplied at registration - there's no external identity provider
+verifying it.
 
 ---
 

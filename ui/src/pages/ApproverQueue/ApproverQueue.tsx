@@ -16,15 +16,20 @@ import { StatusChip } from "../../components/StatusChip/StatusChip";
 import { api, ApiError } from "../../api/client";
 import { formatMoney, formatDateTime, formatPercent } from "../../lib/format";
 import type { ApprovalAction, ApprovalQueueItem } from "../../api/types";
+import { useAuth } from "../../auth/AuthContext";
 import styles from "./ApproverQueue.module.css";
 
 export function ApproverQueue() {
+  const { session } = useAuth();
   const [items, setItems] = useState<ApprovalQueueItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [approverId, setApproverId] = useState("");
+  // Pre-filled from the signed-in approver's identity - still editable, since
+  // the backend doesn't tie approverId to the authenticated user (N1 adds the
+  // gate, not per-field ownership checks).
+  const [approverId, setApproverId] = useState(session?.username ?? "");
   const [reason, setReason] = useState("");
   const [busyAction, setBusyAction] = useState<ApprovalAction | null>(null);
   const [actionResult, setActionResult] = useState<{ ok: boolean; message: string } | null>(null);
