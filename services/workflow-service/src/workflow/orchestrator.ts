@@ -52,9 +52,13 @@ function finalizedEvent(
 
 // ARCHITECTURE.md §3b/§4: decide -> (reject | human_review pause/resume | auto_approve)
 // -> budget reservation + payment saga with compensation.
+// The Dapr Workflow SDK itself types generator-based orchestrators as
+// `Generator<Task<any>, any, any>` (see @dapr/dapr's TWorkflow) since each
+// yield can resolve to a different activity's result type.
 export async function* invoiceApprovalWorkflow(
   ctx: WorkflowContext,
   input: WorkflowInput
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): AsyncGenerator<any, WorkflowResult, any> {
   let invoice = input;
   let decision: DecisionResult = yield ctx.callActivity(callDecisionActivity, invoice);

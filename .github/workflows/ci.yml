@@ -18,6 +18,8 @@ jobs:
       - run: rm -f package-lock.json
       - run: npm install
 
+      - run: npm run lint
+
       - run: npm run build --workspaces --if-present
 
       - run: npm test
