@@ -12,6 +12,7 @@ function fakeResponse(opts: { ok: boolean; status?: number; json?: unknown; cont
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 describe("api client base URL", () => {
@@ -30,6 +31,61 @@ describe("api client base URL", () => {
 
     (import.meta.env as Record<string, string | undefined>).VITE_API_BASE_URL = original;
     vi.resetModules();
+  });
+});
+
+describe("api client - auth", () => {
+  it("registers a new user via POST /auth/register", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      fakeResponse({ ok: true, status: 201, json: { token: "t", username: "u1", role: "submitter" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.register({ username: "u1", password: "longenough", role: "submitter" });
+
+    expect(result).toEqual({ token: "t", username: "u1", role: "submitter" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3000/auth/register",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("logs in via POST /auth/login", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      fakeResponse({ ok: true, json: { token: "t", username: "u1", role: "approver" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.login({ username: "u1", password: "correct" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3000/auth/login",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ username: "u1", password: "correct" }) }),
+    );
+  });
+
+  it("attaches an Authorization header when a session is stored", async () => {
+    localStorage.setItem(
+      "approvalflow.session",
+      JSON.stringify({ token: "stored-token", username: "u1", role: "submitter" }),
+    );
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ ok: true, json: { trackingId: "t1" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.getStatus("t1");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.Authorization).toBe("Bearer stored-token");
+  });
+
+  it("omits the Authorization header when there is no stored session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ ok: true, json: { trackingId: "t1" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.getStatus("t1");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.Authorization).toBeUndefined();
   });
 });
 
