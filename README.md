@@ -11,9 +11,11 @@ model never has the final say on money moving.
 ## Status
 
 Implementation complete: all six services, the UI, and the shared
-`packages/logging` package are built out with tests. See
-[ARCHITECTURE.md](./ARCHITECTURE.md) §8 for the bonus hooks (auth, agent tool
-functions) that are intentionally not built.
+`packages/logging` package are built out with tests, including JWT-based
+auth with role-gated access (submitter / approver / admin — see
+[ARCHITECTURE.md](./ARCHITECTURE.md) §8b). See
+[ARCHITECTURE.md](./ARCHITECTURE.md) §8 for the remaining bonus hooks (agent
+tool functions) that are intentionally not built.
 
 ## Demo
 
@@ -92,13 +94,13 @@ interactive Swagger UI at `/docs` whenever the system is running (see
 
 | Service | Responsibility |
 |---|---|
-| `api-gateway` | Single external entry point, rate-limiting, auth middleware slot, API docs at `/docs` |
+| `api-gateway` | Single external entry point, rate-limiting, JWT auth + role-based authorization, API docs at `/docs` |
 | `submission-service` | Accepts submissions, tracking id + status query, idempotency, outbox event publish |
 | `decision-service` | FX conversion, hard-stop checks, LLM recommendation, deterministic autonomy-ceiling guard |
 | `workflow-service` | Orchestrator (Dapr Workflow): full lifecycle, durable human-review pause/resume, budget reservation, payment saga |
 | `payment-service` | Idempotent reserve → execute → compensate against a mock payment provider |
 | `audit-service` | Records the full decision trail (Postgres), ceiling-proof + dashboard queries, notifies submitters |
-| `ui` | Submit, check status, approver queue, controller dashboard |
+| `ui` | Sign in/register, then role-gated console: submit, check status, approver queue, controller dashboard |
 
 Each service is an independent process with its own container, its own Dapr
 sidecar, and — where it owns data — its own state partition. Every service
@@ -115,6 +117,8 @@ exposes `/healthz`.
    ```
    `secrets.json` needs a real `gemini-api-key` (unless `LLM_PROVIDER` is set
    to the stub provider) and should match the Postgres password in `.env`.
+   `jwt-secret` can be left as the placeholder for local use, or replaced
+   with your own random string.
 2. Start everything with one command:
    ```
    docker compose up --build
@@ -127,6 +131,9 @@ exposes `/healthz`.
    - UI: http://localhost:8080
    - API gateway: http://localhost:3000
    - Interactive API docs (Swagger UI): http://localhost:3000/docs
+4. Sign in: on first use, register an account and pick a role
+   (`submitter`, `approver`, or `admin`) — see [ARCHITECTURE.md](./ARCHITECTURE.md)
+   §8b for what each role can do.
 
 ## Testing
 
