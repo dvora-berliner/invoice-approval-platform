@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { status as grpcStatus } from "@grpc/grpc-js";
 import type { Logger } from "@approvalflow/logging";
 
@@ -11,14 +11,15 @@ const { registerWorkflow, registerActivity, runtimeStart, scheduleNewWorkflow } 
 
 vi.mock("@dapr/dapr", () => ({
   WorkflowRuntime: vi.fn().mockImplementation(function WorkflowRuntimeMock() {
-    return { registerWorkflow, registerActivity, start: runtimeStart };
+    return { registerWorkflow, registerActivity, start: runtimeStart, worker: { _isRunning: true } };
   }),
   DaprWorkflowClient: vi.fn().mockImplementation(function DaprWorkflowClientMock() {
     return { scheduleNewWorkflow };
   }),
 }));
 
-import { startInvoiceWorkflow, startWorkflowRuntime } from "../src/workflow/runtime";
+import { WorkflowRuntime } from "@dapr/dapr";
+import { startInvoiceWorkflow, startWorkflowRuntime, SUPERVISOR_POLL_MS } from "../src/workflow/runtime";
 import { allActivities } from "../src/workflow/activities";
 import { invoiceApprovalWorkflow } from "../src/workflow/orchestrator";
 import type { WorkflowInput } from "../src/types";
@@ -57,6 +58,49 @@ describe("startWorkflowRuntime", () => {
     runtimeStart.mockRejectedValue(new Error("ECONNREFUSED"));
 
     await expect(startWorkflowRuntime(2, 0)).rejects.toThrow("ECONNREFUSED");
+    expect(runtimeStart).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("startWorkflowRuntime - supervisor", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does nothing while the worker stays alive", async () => {
+    runtimeStart.mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    await startWorkflowRuntime();
+    expect(WorkflowRuntime).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(SUPERVISOR_POLL_MS);
+
+    expect(WorkflowRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it("rebuilds and restarts the runtime when the worker dies", async () => {
+    runtimeStart.mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    await startWorkflowRuntime();
+    const firstInstance = vi.mocked(WorkflowRuntime).mock.results[0].value as { worker: { _isRunning: boolean } };
+    firstInstance.worker._isRunning = false;
+
+    await vi.advanceTimersByTimeAsync(SUPERVISOR_POLL_MS);
+
+    expect(WorkflowRuntime).toHaveBeenCalledTimes(2);
+    expect(runtimeStart).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs when rebuilding the runtime keeps failing", async () => {
+    runtimeStart.mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    await startWorkflowRuntime(1, 0);
+    const firstInstance = vi.mocked(WorkflowRuntime).mock.results[0].value as { worker: { _isRunning: boolean } };
+    firstInstance.worker._isRunning = false;
+    runtimeStart.mockRejectedValue(new Error("still unreachable"));
+
+    await vi.advanceTimersByTimeAsync(SUPERVISOR_POLL_MS);
+
     expect(runtimeStart).toHaveBeenCalledTimes(2);
   });
 });

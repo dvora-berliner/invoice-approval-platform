@@ -178,6 +178,7 @@ export async function* invoiceApprovalWorkflow(
       trackingId: invoice.trackingId,
       correlationId: invoice.correlationId,
       reservationId: reserveResponse.reservationId,
+      ...(invoice.forcePaymentFailure ? { simulateOutcome: "failure" as const } : {}),
     });
 
     if (executeResult.status === "executed") {

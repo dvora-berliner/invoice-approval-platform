@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "verify:journeys": "tsx scripts/verify-journeys.ts"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -25,6 +26,7 @@
     "globals": "^15.15.0",
     "jsdom": "^29.1.1",
     "supertest": "^7.2.2",
+    "tsx": "^4.16.0",
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
   },

@@ -100,7 +100,9 @@ router.get("/ceiling-proof", async (req, res) => {
   try {
     const [{ count: itemsChecked }] = await queryRows<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM decision_events
-       WHERE event_type = 'DecisionFinalized' AND payload->>'outcome' IN ('paid','payment_failed')`
+       WHERE event_type = 'DecisionFinalized'
+         AND payload->>'outcome' IN ('paid','payment_failed')
+         AND payload->>'approverId' IS NULL`
     );
     const violations = await queryRows<{ tracking_id: string; correlation_id: string; payload: DecisionFinalizedEvent }>(
       `SELECT tracking_id, correlation_id, payload FROM decision_events

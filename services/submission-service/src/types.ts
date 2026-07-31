@@ -21,6 +21,8 @@ export const invoiceSubmissionSchema = z
     receiptPresent: z.boolean().optional(),
     date: z.string().optional(),
     notes: z.string().optional(),
+    // Test-only hook for D5's verification harness (Journey D).
+    forcePaymentFailure: z.boolean().optional(),
   })
   .passthrough();
 
