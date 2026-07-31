@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
-    "verify:journeys": "tsx scripts/verify-journeys.ts"
+    "verify:journeys": "tsx scripts/verify-journeys.ts",
+    "eval": "npm run verify --workspace=services/decision-service"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
