@@ -240,6 +240,19 @@ describe("paymentExecuteActivity", () => {
       "corr-1",
     );
   });
+
+  it("forwards simulateOutcome to payment-service when set (D5 test hook)", async () => {
+    invokeServiceMock.mockResolvedValue({ reservationId: "r1", status: "failed" });
+
+    await paymentExecuteActivity(ctx, { trackingId: "t1", reservationId: "r1", correlationId: "corr-1", simulateOutcome: "failure" });
+
+    expect(invokeServiceMock).toHaveBeenCalledWith(
+      "payment-service",
+      "payments/execute",
+      { idempotencyKey: "t1:execute", reservationId: "r1", simulateOutcome: "failure" },
+      "corr-1",
+    );
+  });
 });
 
 describe("paymentCompensateActivity", () => {

@@ -159,6 +159,7 @@ export interface PaymentExecuteInput {
   trackingId: string;
   correlationId?: string;
   reservationId: string;
+  simulateOutcome?: "success" | "failure";
 }
 export interface PaymentExecuteResult {
   reservationId: string;
@@ -170,7 +171,11 @@ export async function paymentExecuteActivity(_ctx: WorkflowActivityContext, inpu
   const result = await invokeService<PaymentExecuteResult>(
     "payment-service",
     "payments/execute",
-    { idempotencyKey: `${input.trackingId}:execute`, reservationId: input.reservationId },
+    {
+      idempotencyKey: `${input.trackingId}:execute`,
+      reservationId: input.reservationId,
+      ...(input.simulateOutcome ? { simulateOutcome: input.simulateOutcome } : {}),
+    },
     input.correlationId
   );
   log.info("payment execute result", { trackingId: input.trackingId, status: result.status });

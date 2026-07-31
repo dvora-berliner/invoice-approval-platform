@@ -96,6 +96,19 @@ describe("invoiceApprovalWorkflow - auto_approve payment saga", () => {
     expect(finalizedCall.payload.outcome).toBe("paid");
   });
 
+  it("passes simulateOutcome:failure to paymentExecuteActivity when forcePaymentFailure is set (D5 test hook)", async () => {
+    const { ctx, calls } = makeCtx();
+    const gen = invoiceApprovalWorkflow(ctx, { ...invoice, forcePaymentFailure: true });
+
+    await gen.next(); // decide
+    await gen.next(autoApprove); // reserveBudget
+    await gen.next({ ok: true, remaining: 400 }); // paymentReserve
+    await gen.next({ reservationId: "r1", status: "reserved" }); // paymentExecute
+
+    const paymentExecuteCall = calls[3].input as { simulateOutcome?: string };
+    expect(paymentExecuteCall.simulateOutcome).toBe("failure");
+  });
+
   it("rejects when the department budget is insufficient", async () => {
     const { ctx, calls } = makeCtx();
     const gen = invoiceApprovalWorkflow(ctx, invoice);
