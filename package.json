@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "docker compose run --build --rm tests npx vitest run -c vitest.integration.config.mts",
     "lint": "eslint .",
     "verify:journeys": "tsx scripts/verify-journeys.ts",
     "eval": "npm run verify --workspace=services/decision-service"

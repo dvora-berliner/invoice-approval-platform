@@ -2,11 +2,12 @@ ARG BASE_IMAGE=node:20-alpine
 FROM ${BASE_IMAGE}
 WORKDIR /app
 
-COPY package.json vitest.config.ts ./
+COPY package.json vitest.config.ts vitest.integration.config.mts ./
 COPY packages ./packages
 COPY services ./services
 COPY ui ./ui
 COPY docs ./docs
+COPY tests ./tests
 
 RUN npm install
 RUN npm run build --workspace=packages/logging
