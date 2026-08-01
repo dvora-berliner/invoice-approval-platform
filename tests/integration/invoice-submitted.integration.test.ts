@@ -9,9 +9,12 @@ const PUBLISH_URL = `http://${DAPR_HOST}:${DAPR_HTTP_PORT}/v1.0/publish/pubsub/I
 const trailUrl = (id: string) => `http://${DAPR_HOST}:${APP_PORT}/trail/${id}`;
 
 // audit-service-dapr has no explicit healthcheck in docker-compose.yml, so the
-// sidecar's HTTP port may not be bound yet even after the container "started".
-async function waitForDaprSidecar(): Promise<void> {
-  for (let attempt = 0; attempt < 20; attempt++) {
+// sidecar's HTTP port may not be bound yet even after the container "started" -
+// on a cold CI runner (fresh image pulls, no build cache) this can take well
+// over the 10s a fixed attempt-count loop previously allowed for.
+async function waitForDaprSidecar(timeoutMs = 45_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     try {
       const res = await fetch(`http://${DAPR_HOST}:${DAPR_HTTP_PORT}/v1.0/healthz`);
       if (res.ok) return;
