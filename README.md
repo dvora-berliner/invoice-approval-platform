@@ -1,6 +1,6 @@
 # ApprovalFlow
 
-Invoice & Expense Approval Platform — a microservice-based, AI-assisted system
+Invoice & Expense Approval Platform - a microservice-based, AI-assisted system
 that judges invoices/expenses against a company policy, auto-approves the
 low-risk majority, and escalates the rest to a human approver.
 
@@ -12,7 +12,7 @@ model never has the final say on money moving.
 
 Implementation complete: all six services, the UI, and the shared
 `packages/logging` package are built out with tests, including JWT-based
-auth with role-gated access (submitter / approver / admin — see
+auth with role-gated access (submitter / approver / admin - see
 [ARCHITECTURE.md](./ARCHITECTURE.md) §8b). See
 [ARCHITECTURE.md](./ARCHITECTURE.md) §8 for the remaining bonus hooks (agent
 tool functions) that are intentionally not built.
@@ -40,7 +40,7 @@ renders directly on GitHub, no download needed).
 Full system design, service boundaries, sequence diagrams and requirement
 coverage: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-Design decisions and their rationale: [`docs/adr/`](./docs/adr) —
+Design decisions and their rationale: [`docs/adr/`](./docs/adr) -
 service boundaries, language/platform choice, saga vs. choreography,
 agent-recommends/router-decides split, LLM provider abstraction, Redis vs.
 Postgres per service, ETag concurrency, outbox pattern, resiliency-as-config,
@@ -49,10 +49,10 @@ bonus-hook cost, and the Dapr Workflow SDK reconnect fix.
 Policy source of truth: [`policy.md`](./policy.md).
 Autonomy-ceiling justification: [`docs/PRODUCT-DILEMMA.md`](./docs/PRODUCT-DILEMMA.md).
 
-API reference: [`docs/openapi.yaml`](./docs/openapi.yaml) — an OpenAPI 3.0
+API reference: [`docs/openapi.yaml`](./docs/openapi.yaml) - an OpenAPI 3.0
 spec covering every route exposed through `api-gateway`, served as an
 interactive Swagger UI at `/docs` whenever the system is running (see
-"Running locally" below) — no external tool needed to explore or try requests.
+"Running locally" below) - no external tool needed to explore or try requests.
 
 ## Technologies
 
@@ -63,17 +63,17 @@ interactive Swagger UI at `/docs` whenever the system is running (see
 - Service invocation (sync calls between services)
 - Pub/Sub (domain events → `audit-service`)
 - State store (idempotency keys, workflow state, budget ETags)
-- Secrets (LLM key, DB credentials — never raw env vars in code)
+- Secrets (LLM key, DB credentials - never raw env vars in code)
 - Configuration (hot-reloadable policy + autonomy thresholds)
-- Resiliency policies (timeout, retry, circuit breaker — declared in YAML)
+- Resiliency policies (timeout, retry, circuit breaker - declared in YAML)
 - HTTP rate-limit middleware (on `api-gateway`'s sidecar)
 
 **Data stores**
-- Redis — Dapr state store + pub/sub broker (all services except `audit-service`)
-- Postgres — dedicated store for `audit-service` (aggregation + ordered trail)
+- Redis - Dapr state store + pub/sub broker (all services except `audit-service`)
+- Postgres - dedicated store for `audit-service` (aggregation + ordered trail)
 
 **AI**
-- Gemini — default LLM provider, behind a swappable `LLMProvider` interface
+- Gemini - default LLM provider, behind a swappable `LLMProvider` interface
   (`GeminiProvider` / `StubProvider`), selected via `LLM_PROVIDER`
 
 **Frontend**
@@ -84,10 +84,10 @@ interactive Swagger UI at `/docs` whenever the system is running (see
 
 **Testing & CI**
 - Vitest (unit/integration, all workspaces), Testing Library, Supertest
-- GitHub Actions (`.github/workflows/ci.yml`) — install, build, test on every push
+- GitHub Actions (`.github/workflows/ci.yml`) - install, build, test on every push
 
 **Infra**
-- Docker / Docker Compose — 6 services + Dapr sidecars, Redis, Postgres,
+- Docker / Docker Compose - 6 services + Dapr sidecars, Redis, Postgres,
   Dapr `placement` + `scheduler`, UI, and a dedicated mocked `tests` container
 
 ## Services
@@ -103,7 +103,7 @@ interactive Swagger UI at `/docs` whenever the system is running (see
 | `ui` | Sign in/register, then role-gated console: submit, check status, approver queue, controller dashboard |
 
 Each service is an independent process with its own container, its own Dapr
-sidecar, and — where it owns data — its own state partition. Every service
+sidecar, and - where it owns data - its own state partition. Every service
 exposes `/healthz`.
 
 ## Running locally
@@ -125,33 +125,55 @@ exposes `/healthz`.
    ```
    This single command brings up Redis, Postgres, the Dapr placement/scheduler
    services, all six app services with their Dapr sidecars, the UI, **and**
-   runs the full test suite automatically (the `tests` container) — nothing
+   runs the full test suite automatically (the `tests` container) - nothing
    else to run separately.
 3. Open the app:
    - UI: http://localhost:8080
    - API gateway: http://localhost:3000
    - Interactive API docs (Swagger UI): http://localhost:3000/docs
 4. Sign in: on first use, register an account and pick a role
-   (`submitter`, `approver`, or `admin`) — see [ARCHITECTURE.md](./ARCHITECTURE.md)
+   (`submitter`, `approver`, or `admin`) - see [ARCHITECTURE.md](./ARCHITECTURE.md)
    §8b for what each role can do.
 
 ## Testing
 
-Tests run automatically as part of `docker compose up --build` above (the
-`tests` container, fully mocked, no infra dependency).
+This project has three independent test layers:
 
-To run tests on the host instead, without Docker:
-```
-npm test              # run all workspace tests (vitest)
-npm run test:coverage # with coverage
-```
+- **Unit / component tests** - every service's own logic (vitest), with Dapr
+  fully mocked. Run automatically as part of `docker compose up --build`
+  above (the `tests` container, no infra dependency), or on the host:
+  ```
+  npm test              # run all workspace tests (vitest)
+  npm run test:coverage # with coverage
+  ```
+
+- **Integration tests** - a real Dapr pub/sub + Postgres round trip
+  (`submission → audit-service`), no mocks. Requires `audit-service` (and its
+  dependencies) already running:
+  ```
+  docker compose up -d audit-service audit-service-dapr
+  npm run test:integration
+  ```
+
+- **End-to-end journeys (D5)** - `scripts/verify-journeys.ts` drives the four
+  worked journeys (auto-approve, escalate-and-resume, duplicate, payment
+  failure + compensation) and the anti-cheese guards through the real API
+  gateway against a **live** `docker compose` stack - real Dapr pub/sub, real
+  Postgres, and an actual `workflow-service` restart mid-pause to prove M11
+  durability:
+  ```
+  docker compose up -d
+  npm run verify:journeys
+  ```
+  Prints a PASS/FAIL line per check and exits non-zero on any failure.
 
 `decision-service` also has a standalone policy-fixture check against
-`sample-invoices.json`:
+`sample-invoices.json`, which regenerates the committed
+[eval report](./eval-report.md) (B1):
 ```
-npm run verify --workspace=services/decision-service
+npm run eval
 ```
 
 ## License
 
-Private academic project — All Rights Reserved. See [LICENSE](./LICENSE).
+Private academic project - All Rights Reserved. See [LICENSE](./LICENSE).
