@@ -17,6 +17,7 @@ const supplementInvoiceMock = vi.mocked(api.supplementInvoice);
 
 const baseRecord: InvoiceRecord = {
   trackingId: "track-1",
+  prettyId: "INV-2026-0001",
   vendor: "Acme",
   invoiceNumber: "INV-1",
   total: 100,

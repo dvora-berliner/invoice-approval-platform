@@ -38,6 +38,17 @@ describe("SubmitInvoice", () => {
     );
   });
 
+  it("shows the pretty id as a reference alongside the tracking id", async () => {
+    const user = userEvent.setup();
+    submitInvoiceMock.mockResolvedValue({ trackingId: "track-123", prettyId: "INV-2026-0001" });
+    renderWithTheme(<SubmitInvoice />);
+
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole("button", { name: /Submit invoice/ }));
+
+    await waitFor(() => expect(screen.getByText("INV-2026-0001")).toBeInTheDocument());
+  });
+
   it("shows a duplicate warning without clearing the form", async () => {
     const user = userEvent.setup();
     submitInvoiceMock.mockResolvedValue({
@@ -209,7 +220,7 @@ describe("SubmitInvoice", () => {
       lineItems: [{ description: "Widget", quantity: 3, unitPrice: 10 }],
     });
 
-    await user.click(screen.getByRole("button", { name: "copy tracking id" }));
+    await user.click(screen.getByRole("button", { name: "copy invoice id" }));
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("track-123");
   });
 });

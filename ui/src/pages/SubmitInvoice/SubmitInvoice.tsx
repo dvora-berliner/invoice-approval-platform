@@ -53,7 +53,7 @@ const EMPTY_FORM: FormState = {
 };
 
 type Result =
-  | { kind: "ok"; trackingId: string; duplicate: boolean; message?: string }
+  | { kind: "ok"; trackingId: string; prettyId?: string; duplicate: boolean; message?: string }
   | { kind: "error"; message: string; fieldErrors?: Record<string, string[]> };
 
 export function SubmitInvoice() {
@@ -98,6 +98,7 @@ export function SubmitInvoice() {
       setResult({
         kind: "ok",
         trackingId: res.trackingId,
+        prettyId: res.prettyId,
         duplicate: Boolean(res.duplicateSubmission),
         message: res.message,
       });
@@ -310,13 +311,18 @@ export function SubmitInvoice() {
         <Alert severity={result.duplicate ? "warning" : "success"} className={styles.resultAlert}>
           <Stack direction="row" spacing={1} className={styles.trackingRow}>
             <span>
-              {result.duplicate ? "Already submitted." : "Received."} Tracking id:{" "}
-              <strong className={styles.trackingId}>{result.trackingId}</strong>
+              {result.duplicate ? "Already submitted." : "Received."}{" "}
+              {result.prettyId && (
+                <>
+                  Reference: <strong>{result.prettyId}</strong>{" "}
+                </>
+              )}
+              Tracking id: <strong className={styles.trackingId}>{result.trackingId}</strong>
             </span>
             <IconButton
               size="small"
-              onClick={() => navigator.clipboard.writeText(result.trackingId)}
-              aria-label="copy tracking id"
+              onClick={() => navigator.clipboard.writeText(result.prettyId ?? result.trackingId)}
+              aria-label="copy invoice id"
             >
               <ContentCopyIcon fontSize="inherit" />
             </IconButton>
