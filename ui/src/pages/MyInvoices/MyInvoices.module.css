@@ -1,0 +1,104 @@
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.eyebrow {
+  color: var(--turquoise-700);
+}
+
+.title {
+  margin-bottom: var(--space-1);
+}
+
+.subtitle {
+  font-weight: 400;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 340px 1fr;
+  }
+}
+
+.listItem {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.listItemSelected {
+  background-color: var(--turquoise-50);
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.itemRowSpaced {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+}
+
+.prettyId {
+  font-weight: 700;
+}
+
+.vendorName {
+  color: var(--ink-muted);
+}
+
+.detailCard {
+  padding: var(--space-6);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+}
+
+.trackingId {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  color: var(--ink-muted);
+}
+
+.divider {
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: var(--space-3);
+  column-gap: var(--space-6);
+}
+
+@media (min-width: 600px) {
+  .detailGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.fieldLabel {
+  color: var(--ink-muted);
+  display: block;
+}
+
+.empty {
+  padding: var(--space-8);
+  text-align: center;
+}

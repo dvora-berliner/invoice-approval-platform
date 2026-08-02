@@ -29,6 +29,8 @@ export type InvoiceStatus =
 
 export interface InvoiceRecord extends InvoiceSubmission {
   trackingId: string;
+  prettyId: string;
+  submittedByUsername?: string;
   status: InvoiceStatus;
   submittedAt: string;
   correlationId: string;
@@ -38,8 +40,13 @@ export interface InvoiceRecord extends InvoiceSubmission {
 
 export interface SubmitInvoiceResponse {
   trackingId: string;
+  prettyId?: string;
   duplicateSubmission?: boolean;
   message?: string;
+}
+
+export interface InvoiceListResponse {
+  items: InvoiceRecord[];
 }
 
 export type DecisionRoute = "auto_approve" | "human_review" | "reject";
@@ -83,10 +90,13 @@ export interface ApprovalDecisionResponse {
 export interface DashboardStats {
   totalSubmitted: number;
   totalEscalated: number;
+  pendingHumanReview: number;
   totalFinalized: number;
   autoApproved: { count: number; usdAmount: number };
   humanApproved: { count: number; usdAmount: number };
-  rejected: number;
+  paymentFailed: { count: number; usdAmount: number };
+  autoRejected: number;
+  humanRejected: number;
   submittedByDay: Record<string, number>;
   finalizedByDay: Record<string, number>;
 }
