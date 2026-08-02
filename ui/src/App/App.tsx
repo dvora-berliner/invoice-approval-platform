@@ -9,9 +9,11 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import { theme } from "../theme";
 import { SubmitInvoice } from "../pages/SubmitInvoice/SubmitInvoice";
 import { CheckStatus } from "../pages/CheckStatus/CheckStatus";
+import { MyInvoices } from "../pages/MyInvoices/MyInvoices";
 import { ApproverQueue } from "../pages/ApproverQueue/ApproverQueue";
 import { ControllerDashboard } from "../pages/ControllerDashboard/ControllerDashboard";
 import { Login } from "../pages/Login/Login";
@@ -21,6 +23,7 @@ import styles from "./App.module.css";
 
 const SECTIONS = [
   { label: "Submit", roles: ["submitter", "admin"] as Role[], render: () => <SubmitInvoice /> },
+  { label: "My invoices", roles: ["submitter", "admin"] as Role[], render: () => <MyInvoices /> },
   { label: "Status", roles: ["submitter", "approver", "admin"] as Role[], render: () => <CheckStatus /> },
   { label: "Approvals", roles: ["approver", "admin"] as Role[], render: () => <ApproverQueue /> },
   { label: "Dashboard", roles: ["admin"] as Role[], render: () => <ControllerDashboard /> },
@@ -56,6 +59,7 @@ function AppShell() {
     <Box className={styles.root}>
       <AppBar position="static">
         <Toolbar className={styles.toolbar}>
+          <TaskAltIcon className={styles.wordmarkIcon} />
           <Typography variant="h6" className={styles.wordmark}>
             Approval<span className={styles.wordmarkAccent}>Flow</span>
           </Typography>
@@ -65,7 +69,16 @@ function AppShell() {
           <Box sx={{ flexGrow: 1 }} />
           {session && (
             <>
-              <Chip size="small" label={`${session.username} - ${session.role}`} sx={{ mr: 2 }} />
+              <Chip
+                size="small"
+                label={`${session.username} - ${session.role}`}
+                sx={{
+                  mr: 2,
+                  color: "#ffffff",
+                  bgcolor: "rgba(255, 255, 255, 0.12)",
+                  border: "1px solid rgba(255, 255, 255, 0.24)",
+                }}
+              />
               <Button color="inherit" size="small" onClick={logout}>
                 Sign out
               </Button>
