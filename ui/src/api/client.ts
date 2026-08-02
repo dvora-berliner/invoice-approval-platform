@@ -5,13 +5,16 @@ import type {
   CeilingProof,
   DashboardStats,
   DecisionTrail,
+  InvoiceListResponse,
   InvoiceRecord,
   InvoiceSubmission,
   NotificationsResponse,
   SubmitInvoiceResponse,
 } from "./types";
 import type { AuthSession, Role } from "../auth/types";
-import { getSession } from "../auth/session";
+import { clearSession, getSession } from "../auth/session";
+
+export const UNAUTHORIZED_EVENT = "approvalflow:unauthorized";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -41,6 +44,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const body = isJson ? await res.json().catch(() => undefined) : undefined;
 
   if (!res.ok) {
+    if (res.status === 401 && token) {
+      // Expired token, not a bad-credentials login attempt (those have no token).
+      clearSession();
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
     const message =
       (body && typeof body === "object" && "error" in body && String((body as { error: unknown }).error)) ||
       `Request failed with status ${res.status}`;
@@ -71,6 +79,10 @@ export const api = {
 
   getStatus: (trackingId: string) =>
     request<InvoiceRecord>(`/invoices/${encodeURIComponent(trackingId)}/status`),
+
+  getMyInvoices: () => request<InvoiceListResponse>("/invoices/mine"),
+
+  getAllInvoices: () => request<InvoiceListResponse>("/invoices"),
 
   supplementInvoice: (trackingId: string, payload: Partial<InvoiceSubmission>) =>
     request<SubmitInvoiceResponse>(`/invoices/${encodeURIComponent(trackingId)}/supplement`, {

@@ -14,16 +14,21 @@ vi.mock("../../src/api/client", async () => {
       submitInvoice: vi.fn(),
       getStatus: vi.fn(),
       supplementInvoice: vi.fn(),
+      getMyInvoices: vi.fn().mockResolvedValue({ items: [] }),
+      getAllInvoices: vi.fn().mockResolvedValue({ items: [] }),
       getApprovalQueue: vi.fn().mockResolvedValue({ items: [] }),
       getApproval: vi.fn(),
       decideApproval: vi.fn(),
       getDashboard: vi.fn().mockResolvedValue({
         totalSubmitted: 0,
         totalEscalated: 0,
+        pendingHumanReview: 0,
         totalFinalized: 0,
         autoApproved: { count: 0, usdAmount: 0 },
         humanApproved: { count: 0, usdAmount: 0 },
-        rejected: 0,
+        paymentFailed: { count: 0, usdAmount: 0 },
+        autoRejected: 0,
+        humanRejected: 0,
         submittedByDay: {},
         finalizedByDay: {},
       }),
@@ -35,7 +40,7 @@ vi.mock("../../src/api/client", async () => {
 });
 
 import App from "../../src/App/App";
-import { api } from "../../src/api/client";
+import { api, UNAUTHORIZED_EVENT } from "../../src/api/client";
 
 const apiMock = vi.mocked(api);
 
@@ -77,12 +82,13 @@ describe("App - unauthenticated", () => {
 });
 
 describe("App - authenticated (role-gated tabs)", () => {
-  it("shows only Submit and Status tabs for a submitter, Submit by default", () => {
+  it("shows Submit, My invoices and Status tabs for a submitter, Submit by default", () => {
     loginAs("submitter");
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Submit an invoice" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Submit" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "My invoices" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Status" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Approvals" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Dashboard" })).not.toBeInTheDocument();
@@ -102,6 +108,7 @@ describe("App - authenticated (role-gated tabs)", () => {
     render(<App />);
 
     expect(screen.queryByRole("tab", { name: "Submit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "My invoices" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Dashboard" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Approvals" }));
     expect(screen.getByRole("heading", { name: "Approval queue" })).toBeInTheDocument();
@@ -129,5 +136,15 @@ describe("App - authenticated (role-gated tabs)", () => {
 
     expect(screen.getByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(localStorage.getItem("approvalflow.session")).toBeNull();
+  });
+
+  it("bounces to the login screen when the token expires mid-session", async () => {
+    loginAs("admin");
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "Submit an invoice" })).toBeInTheDocument();
+
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
   });
 });

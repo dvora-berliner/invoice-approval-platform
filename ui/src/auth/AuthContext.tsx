@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { AuthSession } from "./types";
 import { clearSession, getSession, setSession } from "./session";
+import { UNAUTHORIZED_EVENT } from "../api/client";
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -22,6 +23,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSession();
     setSessionState(null);
   };
+
+  useEffect(() => {
+    const onUnauthorized = () => setSessionState(null);
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, []);
 
   return <AuthContext.Provider value={{ session, setAuthenticated, logout }}>{children}</AuthContext.Provider>;
 }

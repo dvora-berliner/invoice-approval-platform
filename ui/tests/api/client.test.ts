@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError } from "../../src/api/client";
+import { api, ApiError, UNAUTHORIZED_EVENT } from "../../src/api/client";
 
 function fakeResponse(opts: { ok: boolean; status?: number; json?: unknown; contentType?: string }) {
   return {
@@ -87,6 +87,36 @@ describe("api client - auth", () => {
     const [, init] = fetchMock.mock.calls[0];
     expect(init.headers.Authorization).toBeUndefined();
   });
+
+  it("clears the session and fires the unauthorized event on a 401 with an expired token", async () => {
+    localStorage.setItem(
+      "approvalflow.session",
+      JSON.stringify({ token: "stale-token", username: "u1", role: "submitter" }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 401, json: { error: "Invalid or expired token" } })),
+    );
+    const onUnauthorized = vi.fn();
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+
+    await expect(api.getStatus("t1")).rejects.toMatchObject({ status: 401 });
+
+    expect(localStorage.getItem("approvalflow.session")).toBeNull();
+    expect(onUnauthorized).toHaveBeenCalledOnce();
+    window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  });
+
+  it("does not treat a 401 on a token-less request (bad login credentials) as session expiry", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 401, json: { error: "Invalid username or password" } })));
+    const onUnauthorized = vi.fn();
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+
+    await expect(api.login({ username: "u1", password: "wrong" })).rejects.toMatchObject({ status: 401 });
+
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  });
 });
 
 describe("api client", () => {
@@ -122,6 +152,20 @@ describe("api client", () => {
       "http://localhost:3000/invoices/t1/supplement",
       expect.objectContaining({ method: "PATCH", body: JSON.stringify({ notes: "more info" }) }),
     );
+  });
+
+  it("fetches the signed-in user's invoices", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ ok: true, json: { items: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.getMyInvoices()).resolves.toEqual({ items: [] });
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:3000/invoices/mine", expect.anything());
+  });
+
+  it("fetches every invoice (admin)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ ok: true, json: { items: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.getAllInvoices()).resolves.toEqual({ items: [] });
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:3000/invoices", expect.anything());
   });
 
   it("fetches the approval queue", async () => {

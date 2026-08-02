@@ -5,30 +5,43 @@ vi.mock("../src/dapr", () => ({
   claimDedupKey: vi.fn(),
   getInvoiceRecord: vi.fn(),
   getInvoiceRecordWithEtag: vi.fn(),
+  getState: vi.fn(),
+  getStateWithEtag: vi.fn(),
   saveInvoiceRecord: vi.fn(),
   saveInvoiceRecordWithEtag: vi.fn(),
   saveInvoiceRecordWithOutboxEvent: vi.fn(),
+  saveStateWithEtag: vi.fn(),
 }));
 
 import {
   claimDedupKey,
   getInvoiceRecord,
   getInvoiceRecordWithEtag,
+  getState,
+  getStateWithEtag,
   saveInvoiceRecord,
   saveInvoiceRecordWithEtag,
   saveInvoiceRecordWithOutboxEvent,
+  saveStateWithEtag,
 } from "../src/dapr";
 import { app } from "../src/app";
 
 const claimDedupKeyMock = vi.mocked(claimDedupKey);
 const getInvoiceRecordMock = vi.mocked(getInvoiceRecord);
 const getInvoiceRecordWithEtagMock = vi.mocked(getInvoiceRecordWithEtag);
+const getStateMock = vi.mocked(getState);
+const getStateWithEtagMock = vi.mocked(getStateWithEtag);
 const saveInvoiceRecordMock = vi.mocked(saveInvoiceRecord);
 const saveInvoiceRecordWithEtagMock = vi.mocked(saveInvoiceRecordWithEtag);
 const saveInvoiceRecordWithOutboxEventMock = vi.mocked(saveInvoiceRecordWithOutboxEvent);
+const saveStateWithEtagMock = vi.mocked(saveStateWithEtag);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Counter/index writes succeed by default - individual tests override to test failure paths.
+  getStateMock.mockResolvedValue(null);
+  getStateWithEtagMock.mockResolvedValue({ value: null, etag: "" });
+  saveStateWithEtagMock.mockResolvedValue(true);
 });
 
 const validSubmission = { vendor: "Acme", invoiceNumber: "INV-1", total: 100 };
@@ -49,7 +62,7 @@ describe("POST /invoices", () => {
     expect(claimDedupKeyMock).not.toHaveBeenCalled();
   });
 
-  it("accepts a new submission and returns a trackingId", async () => {
+  it("accepts a new submission and returns a trackingId and prettyId", async () => {
     claimDedupKeyMock.mockResolvedValue({ claimed: true });
     saveInvoiceRecordMock.mockResolvedValue(undefined);
 
@@ -57,7 +70,33 @@ describe("POST /invoices", () => {
 
     expect(res.status).toBe(202);
     expect(res.body.trackingId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(res.body.prettyId).toMatch(/^INV-\d{4}-0001$/);
     expect(saveInvoiceRecordMock).toHaveBeenCalledOnce();
+  });
+
+  it("tags the record with the forwarded username and indexes it for both the submitter and the global list", async () => {
+    claimDedupKeyMock.mockResolvedValue({ claimed: true });
+    saveInvoiceRecordMock.mockResolvedValue(undefined);
+
+    await request(app).post("/invoices").set("x-user-username", "alice").send(validSubmission);
+
+    expect(saveInvoiceRecordMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ submittedByUsername: "alice" }),
+    );
+    expect(saveStateWithEtagMock).toHaveBeenCalledWith("submitter-index:alice", expect.any(Array), "");
+    expect(saveStateWithEtagMock).toHaveBeenCalledWith("all-invoices-index", expect.any(Array), "");
+  });
+
+  it("returns 500 when allocating a pretty id fails after retries", async () => {
+    claimDedupKeyMock.mockResolvedValue({ claimed: true });
+    getStateWithEtagMock.mockResolvedValue({ value: 0, etag: "stale" });
+    saveStateWithEtagMock.mockResolvedValue(false);
+
+    const res = await request(app).post("/invoices").send(validSubmission);
+
+    expect(res.status).toBe(500);
+    expect(saveInvoiceRecordMock).not.toHaveBeenCalled();
   });
 
   it("short-circuits a duplicate submission with the existing record", async () => {
@@ -153,6 +192,79 @@ describe("GET /invoices/:trackingId/status", () => {
     getInvoiceRecordMock.mockRejectedValue(new Error("boom"));
     const res = await request(app).get("/invoices/t1/status");
     expect(res.status).toBe(500);
+  });
+
+  it("resolves a pretty id to its record when the direct lookup misses", async () => {
+    getInvoiceRecordMock.mockImplementation(async (key: string) =>
+      key === "invoice:t1"
+        ? {
+            trackingId: "t1",
+            prettyId: "INV-2026-0001",
+            status: "pending",
+            vendor: "Acme",
+            invoiceNumber: "INV-1",
+            total: 100,
+            submittedAt: "2026-01-01T00:00:00.000Z",
+            correlationId: "corr-1",
+          }
+        : null,
+    );
+    getStateMock.mockResolvedValue("t1");
+
+    const res = await request(app).get("/invoices/inv-2026-0001/status");
+
+    expect(getStateMock).toHaveBeenCalledWith("pretty:INV-2026-0001");
+    expect(res.status).toBe(200);
+    expect(res.body.trackingId).toBe("t1");
+  });
+});
+
+describe("GET /invoices/mine", () => {
+  it("400s when no user identity was forwarded", async () => {
+    const res = await request(app).get("/invoices/mine");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns only the requesting user's invoices, newest first", async () => {
+    getStateMock.mockResolvedValue(["t1", "t2"]);
+    getInvoiceRecordMock.mockImplementation(async (key: string) => ({
+      trackingId: key.replace("invoice:", ""),
+      prettyId: `INV-2026-000${key.endsWith("t1") ? "1" : "2"}`,
+      status: "pending",
+      vendor: "Acme",
+      invoiceNumber: "INV-1",
+      total: 100,
+      submittedAt: key.endsWith("t1") ? "2026-01-01T00:00:00.000Z" : "2026-01-02T00:00:00.000Z",
+      correlationId: "corr-1",
+    }));
+
+    const res = await request(app).get("/invoices/mine").set("x-user-username", "alice");
+
+    expect(getStateMock).toHaveBeenCalledWith("submitter-index:alice");
+    expect(res.status).toBe(200);
+    expect(res.body.items.map((i: { trackingId: string }) => i.trackingId)).toEqual(["t2", "t1"]);
+  });
+});
+
+describe("GET /invoices", () => {
+  it("returns every indexed invoice", async () => {
+    getStateMock.mockResolvedValue(["t1"]);
+    getInvoiceRecordMock.mockResolvedValue({
+      trackingId: "t1",
+      prettyId: "INV-2026-0001",
+      status: "pending",
+      vendor: "Acme",
+      invoiceNumber: "INV-1",
+      total: 100,
+      submittedAt: "2026-01-01T00:00:00.000Z",
+      correlationId: "corr-1",
+    });
+
+    const res = await request(app).get("/invoices");
+
+    expect(getStateMock).toHaveBeenCalledWith("all-invoices-index");
+    expect(res.status).toBe(200);
+    expect(res.body.items).toHaveLength(1);
   });
 });
 

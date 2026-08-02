@@ -1,0 +1,10 @@
+.trackingId {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+}
+
+.empty {
+  padding: var(--space-8);
+  text-align: center;
+}

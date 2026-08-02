@@ -14,9 +14,14 @@ export interface UpstreamResponse {
 // hardcoded 200, so callers see real errors instead of a false success.
 export async function invokeService(appId: string, method: string, req: Request): Promise<UpstreamResponse> {
   const hasBody = !["GET", "HEAD"].includes(req.method);
+  const headers = withCorrelationHeader(req.correlationId, { "Content-Type": "application/json" });
+  if (req.user) {
+    headers["x-user-username"] = req.user.username;
+    headers["x-user-role"] = req.user.role;
+  }
   const res = await fetch(`${DAPR_BASE}/invoke/${appId}/method/${method}`, {
     method: req.method,
-    headers: withCorrelationHeader(req.correlationId, { "Content-Type": "application/json" }),
+    headers,
     body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
   });
   const text = await res.text();

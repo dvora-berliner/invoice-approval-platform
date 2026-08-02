@@ -34,6 +34,8 @@ const invoiceStatusValues = ["pending", "awaiting_approval", "rejected", "paid",
 
 export interface InvoiceRecord extends InvoiceSubmission {
   trackingId: string;
+  prettyId: string;
+  submittedByUsername?: string;
   status: InvoiceStatus;
   submittedAt: string;
   correlationId: string;

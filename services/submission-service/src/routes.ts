@@ -6,9 +6,12 @@ import {
   claimDedupKey,
   getInvoiceRecord,
   getInvoiceRecordWithEtag,
+  getState,
+  getStateWithEtag,
   saveInvoiceRecord,
   saveInvoiceRecordWithEtag,
   saveInvoiceRecordWithOutboxEvent,
+  saveStateWithEtag,
 } from "./dapr";
 import {
   invoiceSubmissionSchema,
@@ -23,6 +26,31 @@ export const router = Router();
 const invoiceKeyOf = (trackingId: string) => `invoice:${trackingId}`;
 const TERMINAL_STATUSES: ReadonlySet<InvoiceStatus> = new Set(["paid", "rejected", "payment_failed"]);
 const MAX_ETAG_RETRIES = 5;
+
+const submitterIndexKeyOf = (username: string) => `submitter-index:${username}`;
+const ALL_INVOICES_INDEX_KEY = "all-invoices-index";
+const INVOICE_COUNTER_KEY = "invoice-counter";
+const prettyKeyOf = (prettyId: string) => `pretty:${prettyId}`;
+
+async function appendToIndex(key: string, trackingId: string): Promise<void> {
+  for (let attempt = 0; attempt < MAX_ETAG_RETRIES; attempt++) {
+    const { value, etag } = await getStateWithEtag<string[]>(key);
+    if (await saveStateWithEtag(key, [...(value ?? []), trackingId], etag)) return;
+  }
+  throw new Error(`Failed to append to index ${key} after retries`);
+}
+
+async function nextPrettyId(): Promise<string> {
+  const year = new Date().getFullYear();
+  for (let attempt = 0; attempt < MAX_ETAG_RETRIES; attempt++) {
+    const { value, etag } = await getStateWithEtag<number>(INVOICE_COUNTER_KEY);
+    const next = (value ?? 0) + 1;
+    if (await saveStateWithEtag(INVOICE_COUNTER_KEY, next, etag)) {
+      return `INV-${year}-${String(next).padStart(4, "0")}`;
+    }
+  }
+  throw new Error("Failed to allocate a pretty invoice id after retries");
+}
 
 // F2: status responses must include a plain-language explanation, not just a status code.
 function statusMessage(status: InvoiceRecord["status"]): string {
@@ -71,16 +99,24 @@ router.post("/invoices", async (req, res) => {
       return;
     }
 
+    const prettyId = await nextPrettyId();
+    const submittedByUsername = req.header("x-user-username") || undefined;
+
     const record: InvoiceRecord = attachCorrelationId(req.correlationId, {
       ...submission,
       trackingId,
+      prettyId,
+      submittedByUsername,
       status: "pending",
       submittedAt: new Date().toISOString(),
     });
     await saveInvoiceRecord(invoiceKeyOf(trackingId), record);
+    await saveStateWithEtag(prettyKeyOf(prettyId), trackingId, "");
+    await appendToIndex(ALL_INVOICES_INDEX_KEY, trackingId);
+    if (submittedByUsername) await appendToIndex(submitterIndexKeyOf(submittedByUsername), trackingId);
 
-    req.log.info("invoice submitted", { trackingId });
-    res.status(202).json({ trackingId });
+    req.log.info("invoice submitted", { trackingId, prettyId });
+    res.status(202).json({ trackingId, prettyId });
   } catch (err) {
     req.log.error("POST /invoices failed", { error: String(err) });
     res.status(500).json({ error: "Failed to submit invoice" });
@@ -89,7 +125,11 @@ router.post("/invoices", async (req, res) => {
 
 router.get("/invoices/:trackingId/status", async (req, res) => {
   try {
-    const record = await getInvoiceRecord<InvoiceRecord>(invoiceKeyOf(req.params.trackingId));
+    let record = await getInvoiceRecord<InvoiceRecord>(invoiceKeyOf(req.params.trackingId));
+    if (!record) {
+      const resolvedTrackingId = await getState<string>(prettyKeyOf(req.params.trackingId.toUpperCase()));
+      if (resolvedTrackingId) record = await getInvoiceRecord<InvoiceRecord>(invoiceKeyOf(resolvedTrackingId));
+    }
     if (!record) {
       res.status(404).json({ error: "No invoice found for this trackingId" });
       return;
@@ -98,6 +138,39 @@ router.get("/invoices/:trackingId/status", async (req, res) => {
   } catch (err) {
     req.log.error("GET /invoices/:trackingId/status failed", { error: String(err) });
     res.status(500).json({ error: "Failed to fetch invoice status" });
+  }
+});
+
+async function loadIndexedInvoices(indexKey: string): Promise<InvoiceRecord[]> {
+  const index = (await getState<string[]>(indexKey)) ?? [];
+  const items = await Promise.all(index.map((id) => getInvoiceRecord<InvoiceRecord>(invoiceKeyOf(id))));
+  return items
+    .filter((item): item is InvoiceRecord => item !== null)
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+}
+
+router.get("/invoices/mine", async (req, res) => {
+  const username = req.header("x-user-username");
+  if (!username) {
+    res.status(400).json({ error: "Missing user identity" });
+    return;
+  }
+  try {
+    res.status(200).json({ items: await loadIndexedInvoices(submitterIndexKeyOf(username)) });
+  } catch (err) {
+    req.log.error("GET /invoices/mine failed", { error: String(err) });
+    res.status(500).json({ error: "Failed to load your invoices" });
+  }
+});
+
+// Admin-only - enforced at the gateway, not re-checked here (same trust model as the rest
+// of this service's routes).
+router.get("/invoices", async (req, res) => {
+  try {
+    res.status(200).json({ items: await loadIndexedInvoices(ALL_INVOICES_INDEX_KEY) });
+  } catch (err) {
+    req.log.error("GET /invoices failed", { error: String(err) });
+    res.status(500).json({ error: "Failed to load invoices" });
   }
 });
 

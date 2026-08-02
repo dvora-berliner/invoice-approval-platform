@@ -8,15 +8,18 @@ vi.mock("../src/db", () => ({
   queryRows: vi.fn(),
 }));
 vi.mock("../src/config", () => ({ loadCeiling: vi.fn() }));
+vi.mock("../src/serviceClient", () => ({ resolveTrackingId: vi.fn() }));
 
 import { eventsForTrackingOrCorrelation, queryRows } from "../src/db";
 import { loadCeiling } from "../src/config";
+import { resolveTrackingId } from "../src/serviceClient";
 import { notificationMessageFor, router } from "../src/routes";
 import type { DecisionEventRow } from "../src/db";
 
 const eventsForTrackingOrCorrelationMock = vi.mocked(eventsForTrackingOrCorrelation);
 const queryRowsMock = vi.mocked(queryRows);
 const loadCeilingMock = vi.mocked(loadCeiling);
+const resolveTrackingIdMock = vi.mocked(resolveTrackingId);
 
 const app = express();
 app.use(express.json());
@@ -25,6 +28,8 @@ app.use(router);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Identity by default - most tests aren't exercising pretty-id resolution.
+  resolveTrackingIdMock.mockImplementation(async (id) => id);
 });
 
 describe("GET /trail/:id", () => {
@@ -47,6 +52,17 @@ describe("GET /trail/:id", () => {
     const res = await request(app).get("/trail/t1");
     expect(res.status).toBe(500);
   });
+
+  it("resolves a pretty id to its tracking id before querying", async () => {
+    resolveTrackingIdMock.mockResolvedValue("t1");
+    eventsForTrackingOrCorrelationMock.mockResolvedValue([{ id: 1 } as unknown as DecisionEventRow]);
+
+    const res = await request(app).get("/trail/INV-2026-0001");
+
+    expect(resolveTrackingIdMock).toHaveBeenCalledWith("INV-2026-0001");
+    expect(eventsForTrackingOrCorrelationMock).toHaveBeenCalledWith("t1");
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("GET /dashboard", () => {
@@ -56,25 +72,29 @@ describe("GET /dashboard", () => {
   }
 
   it("returns zeroed aggregates when nothing has happened yet", async () => {
-    queueRows([[], [], [], []]);
+    queueRows([[], [], [], [], []]);
     const res = await request(app).get("/dashboard");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       totalSubmitted: 0,
       totalEscalated: 0,
+      pendingHumanReview: 0,
       totalFinalized: 0,
       autoApproved: { count: 0, usdAmount: 0 },
       humanApproved: { count: 0, usdAmount: 0 },
-      rejected: 0,
+      paymentFailed: { count: 0, usdAmount: 0 },
+      autoRejected: 0,
+      humanRejected: 0,
       submittedByDay: {},
       finalizedByDay: {},
     });
   });
 
-  it("aggregates auto-approved, human-approved and rejected outcomes", async () => {
+  it("aggregates auto/human approvals, payment failures and auto/human rejections separately", async () => {
     queueRows([
       [{ count: "5" }],
       [{ count: "2" }],
+      [{ count: "1" }],
       [{ day: "2026-01-01", count: "5" }],
       [
         { payload: { outcome: "paid", usdAmount: 100 }, occurred_at: "2026-01-01T00:00:00.000Z" },
@@ -82,7 +102,8 @@ describe("GET /dashboard", () => {
         { payload: { outcome: "payment_failed", usdAmount: 50 }, occurred_at: "2026-01-02T00:00:00.000Z" },
         { payload: { outcome: "payment_failed", approverId: "a2", usdAmount: 75 }, occurred_at: "2026-01-02T01:00:00.000Z" },
         { payload: { outcome: "rejected" }, occurred_at: "2026-01-02T02:00:00.000Z" },
-        { payload: { outcome: "unrecognized_outcome" }, occurred_at: "2026-01-02T03:00:00.000Z" },
+        { payload: { outcome: "rejected", approverId: "a3" }, occurred_at: "2026-01-02T03:00:00.000Z" },
+        { payload: { outcome: "unrecognized_outcome" }, occurred_at: "2026-01-02T04:00:00.000Z" },
       ],
     ]);
 
@@ -92,12 +113,15 @@ describe("GET /dashboard", () => {
     expect(res.body).toEqual({
       totalSubmitted: 5,
       totalEscalated: 2,
-      totalFinalized: 6,
-      autoApproved: { count: 2, usdAmount: 150 },
-      humanApproved: { count: 2, usdAmount: 275 },
-      rejected: 1,
+      pendingHumanReview: 1,
+      totalFinalized: 7,
+      autoApproved: { count: 1, usdAmount: 100 },
+      humanApproved: { count: 1, usdAmount: 200 },
+      paymentFailed: { count: 2, usdAmount: 125 },
+      autoRejected: 1,
+      humanRejected: 1,
       submittedByDay: { "2026-01-01": 5 },
-      finalizedByDay: { "2026-01-01": 2, "2026-01-02": 4 },
+      finalizedByDay: { "2026-01-01": 2, "2026-01-02": 5 },
     });
   });
 
@@ -253,6 +277,27 @@ describe("GET /notifications/:trackingId", () => {
     eventsForTrackingOrCorrelationMock.mockRejectedValue(new Error("db down"));
     const res = await request(app).get("/notifications/t1");
     expect(res.status).toBe(500);
+  });
+
+  it("resolves a pretty id to its tracking id before querying", async () => {
+    resolveTrackingIdMock.mockResolvedValue("t1");
+    eventsForTrackingOrCorrelationMock.mockResolvedValue([
+      {
+        id: 1,
+        event_type: "DecisionFinalized",
+        tracking_id: "t1",
+        correlation_id: "c1",
+        payload: { outcome: "paid" },
+        occurred_at: "2026-01-01T00:00:00.000Z",
+        received_at: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    const res = await request(app).get("/notifications/INV-2026-0001");
+
+    expect(resolveTrackingIdMock).toHaveBeenCalledWith("INV-2026-0001");
+    expect(eventsForTrackingOrCorrelationMock).toHaveBeenCalledWith("t1");
+    expect(res.status).toBe(200);
   });
 });
 

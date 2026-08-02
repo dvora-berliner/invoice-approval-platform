@@ -9,6 +9,8 @@ import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
 import Collapse from "@mui/material/Collapse";
 import CircularProgress from "@mui/material/CircularProgress";
+import IconButton from "@mui/material/IconButton";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { StatusChip } from "../../components/StatusChip/StatusChip";
 import { api, ApiError } from "../../api/client";
 import { formatMoney, formatDateTime } from "../../lib/format";
@@ -114,9 +116,18 @@ export function CheckStatus() {
             </Typography>
             <StatusChip value={record.status} />
           </Stack>
-          <Typography variant="body2" color="text.secondary" className={styles.trackingId}>
-            {record.trackingId}
-          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+            <Typography variant="body2" color="text.secondary" className={styles.trackingId}>
+              {record.prettyId} · {record.trackingId}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => navigator.clipboard.writeText(record.prettyId)}
+              aria-label="copy invoice id"
+            >
+              <ContentCopyIcon fontSize="inherit" />
+            </IconButton>
+          </Stack>
 
           <Typography className={styles.message}>{record.message}</Typography>
           {record.reason && record.reason !== record.message && (

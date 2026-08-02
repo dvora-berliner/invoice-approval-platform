@@ -90,6 +90,22 @@ export async function saveInvoiceRecordWithEtag(invoiceKey: string, invoiceValue
   return conditionalSave(invoiceKey, JSON.stringify(invoiceValue), etag);
 }
 
+// Generic (single-encoded, unlike the invoice-record helpers above) - for indices/counters.
+export async function getStateWithEtag<T>(key: string): Promise<RecordWithEtag<T>> {
+  const res = await fetch(`${DAPR_BASE}/state/${STATE_STORE}/${key}`);
+  if (res.status !== 200 && res.status !== 204 && res.status !== 404) {
+    throw new Error(`Dapr state get failed: ${res.status} ${await res.text()}`);
+  }
+  const etag = res.headers.get("etag") ?? "";
+  if (res.status !== 200) return { value: null, etag };
+  const text = await res.text();
+  return { value: text ? (JSON.parse(text) as T) : null, etag };
+}
+
+export async function saveStateWithEtag(key: string, value: unknown, etag: string): Promise<boolean> {
+  return conditionalSave(key, value, etag);
+}
+
 export async function saveInvoiceRecord(invoiceKey: string, invoiceValue: unknown): Promise<void> {
   const res = await fetch(`${DAPR_BASE}/state/${STATE_STORE}/transaction`, {
     method: "POST",

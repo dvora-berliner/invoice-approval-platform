@@ -23,6 +23,8 @@ function proxy(appId: string, methodOf: (req: Request) => string) {
 
 // submission-service (F1, F2, F3, F5)
 router.post("/invoices", authenticate, requireRole("submitter", "admin"), proxy("submission-service", () => "invoices"));
+router.get("/invoices/mine", authenticate, proxy("submission-service", () => "invoices/mine"));
+router.get("/invoices", authenticate, requireRole("admin"), proxy("submission-service", () => "invoices"));
 router.get("/invoices/:trackingId/status", authenticate, proxy("submission-service", (req) => `invoices/${req.params.trackingId}/status`));
 router.patch(
   "/invoices/:trackingId/supplement",
