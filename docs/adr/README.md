@@ -20,3 +20,4 @@ existed) -> Decision (what was chosen) -> Consequences
 - [0010 - Why the bonus hooks are low-cost to add later](0010-bonus-hooks-are-low-cost-to-add-later.md)
 - [0011 - Dapr Workflow SDK reconnect - app-level supervisor](0011-workflow-sdk-reconnect-supervisor.md)
 - [0012 - policy.md hot-reload via bind mount, not Dapr Configuration](0012-policy-md-live-reload-via-bind-mount.md)
+- [0013 - Deterministic clause retrieval, not semantic RAG](0013-policy-retrieval-deterministic-not-semantic.md)
