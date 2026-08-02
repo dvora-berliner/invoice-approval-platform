@@ -21,10 +21,13 @@ describe("DashboardOverview", () => {
     getDashboardMock.mockResolvedValue({
       totalSubmitted: 10,
       totalEscalated: 3,
+      pendingHumanReview: 1,
       totalFinalized: 8,
       autoApproved: { count: 5, usdAmount: 500 },
       humanApproved: { count: 3, usdAmount: 900 },
-      rejected: 0,
+      paymentFailed: { count: 0, usdAmount: 0 },
+      autoRejected: 0,
+      humanRejected: 0,
       submittedByDay: { "2026-01-01": 4, "2026-01-02": 6 },
       finalizedByDay: { "2026-01-01": 8 },
     });
@@ -39,10 +42,13 @@ describe("DashboardOverview", () => {
     getDashboardMock.mockResolvedValue({
       totalSubmitted: 0,
       totalEscalated: 0,
+      pendingHumanReview: 0,
       totalFinalized: 0,
       autoApproved: { count: 0, usdAmount: 0 },
       humanApproved: { count: 0, usdAmount: 0 },
-      rejected: 0,
+      paymentFailed: { count: 0, usdAmount: 0 },
+      autoRejected: 0,
+      humanRejected: 0,
       submittedByDay: {},
       finalizedByDay: {},
     });

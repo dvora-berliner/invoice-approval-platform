@@ -44,9 +44,9 @@ export function DashboardOverview() {
     <Box>
       <Box className={styles.statGrid}>
         <StatCard label="Submitted" value={stats.totalSubmitted} />
-        <StatCard label="Escalated to human" value={stats.totalEscalated} />
+        <StatCard label="Escalated to human (all-time)" value={stats.totalEscalated} />
+        <StatCard label="Awaiting human now" value={stats.pendingHumanReview} />
         <StatCard label="Finalized" value={stats.totalFinalized} />
-        <StatCard label="Rejected" value={stats.rejected} />
         <StatCard
           label="Auto-approved"
           value={stats.autoApproved.count}
@@ -57,6 +57,13 @@ export function DashboardOverview() {
           value={stats.humanApproved.count}
           sub={formatMoney(stats.humanApproved.usdAmount)}
         />
+        <StatCard
+          label="Payment failed"
+          value={stats.paymentFailed.count}
+          sub={formatMoney(stats.paymentFailed.usdAmount)}
+        />
+        <StatCard label="Auto-rejected" value={stats.autoRejected} />
+        <StatCard label="Human-rejected" value={stats.humanRejected} />
       </Box>
 
       <Box className={styles.chartGrid}>

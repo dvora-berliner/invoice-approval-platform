@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eventsForTrackingOrCorrelation, queryRows, type DecisionEventRow } from "./db";
 import { loadCeiling } from "./config";
+import { resolveTrackingId } from "./serviceClient";
 import type { DecisionFinalizedEvent, InfoRequestedEvent } from "./types";
 
 export const router = Router();
@@ -9,7 +10,8 @@ export const router = Router();
 // submitter/approver typically only knows the trackingId, not the internal correlation id.
 router.get("/trail/:id", async (req, res) => {
   try {
-    const events = await eventsForTrackingOrCorrelation(req.params.id);
+    const resolvedId = await resolveTrackingId(req.params.id);
+    const events = await eventsForTrackingOrCorrelation(resolvedId);
     if (events.length === 0) {
       res.status(404).json({ error: "No decision trail found for this id" });
       return;
@@ -35,6 +37,13 @@ router.get("/dashboard", async (req, res) => {
     const [escalatedCount] = await queryRows<{ count: string }>(
       `SELECT COUNT(DISTINCT tracking_id)::text AS count FROM decision_events WHERE event_type = 'EscalationCreated'`
     );
+    const [pendingHumanReviewCount] = await queryRows<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM (
+         SELECT DISTINCT tracking_id FROM decision_events WHERE event_type = 'EscalationCreated'
+         EXCEPT
+         SELECT DISTINCT tracking_id FROM decision_events WHERE event_type = 'DecisionFinalized'
+       ) pending`
+    );
     const submittedByDayRows = await queryRows<{ day: string; count: string }>(
       `SELECT occurred_at::date::text AS day, COUNT(*)::text AS count
        FROM decision_events WHERE event_type = 'InvoiceSubmitted' GROUP BY day ORDER BY day`
@@ -47,7 +56,10 @@ router.get("/dashboard", async (req, res) => {
     let humanApprovedCount = 0;
     let autoApprovedUsd = 0;
     let humanApprovedUsd = 0;
-    let rejectedCount = 0;
+    let paymentFailedCount = 0;
+    let paymentFailedUsd = 0;
+    let autoRejectedCount = 0;
+    let humanRejectedCount = 0;
     const finalizedByDay = new Map<string, number>();
 
     for (const row of finalized) {
@@ -55,7 +67,7 @@ router.get("/dashboard", async (req, res) => {
       const day = row.occurred_at.slice(0, 10);
       finalizedByDay.set(day, (finalizedByDay.get(day) ?? 0) + 1);
 
-      if (outcome === "paid" || outcome === "payment_failed") {
+      if (outcome === "paid") {
         if (row.payload.approverId) {
           humanApprovedCount += 1;
           humanApprovedUsd += row.payload.usdAmount;
@@ -63,18 +75,28 @@ router.get("/dashboard", async (req, res) => {
           autoApprovedCount += 1;
           autoApprovedUsd += row.payload.usdAmount;
         }
+      } else if (outcome === "payment_failed") {
+        paymentFailedCount += 1;
+        paymentFailedUsd += row.payload.usdAmount;
       } else if (outcome === "rejected") {
-        rejectedCount += 1;
+        if (row.payload.approverId) {
+          humanRejectedCount += 1;
+        } else {
+          autoRejectedCount += 1;
+        }
       }
     }
 
     res.status(200).json({
       totalSubmitted: Number(submittedCount?.count ?? 0),
       totalEscalated: Number(escalatedCount?.count ?? 0),
+      pendingHumanReview: Number(pendingHumanReviewCount?.count ?? 0),
       totalFinalized: finalized.length,
       autoApproved: { count: autoApprovedCount, usdAmount: autoApprovedUsd },
       humanApproved: { count: humanApprovedCount, usdAmount: humanApprovedUsd },
-      rejected: rejectedCount,
+      paymentFailed: { count: paymentFailedCount, usdAmount: paymentFailedUsd },
+      autoRejected: autoRejectedCount,
+      humanRejected: humanRejectedCount,
       // Two different clocks: when items arrived vs. when the system finished with them.
       submittedByDay: Object.fromEntries(submittedByDayRows.map((r) => [r.day, Number(r.count)])),
       finalizedByDay: Object.fromEntries(finalizedByDay),
@@ -148,7 +170,8 @@ export function notificationMessageFor(row: DecisionEventRow): string {
 // M8 "notify submitter": no email/SSE infra yet, so this exposes the recorded events for polling.
 router.get("/notifications/:trackingId", async (req, res) => {
   try {
-    const events = await eventsForTrackingOrCorrelation(req.params.trackingId);
+    const resolvedId = await resolveTrackingId(req.params.trackingId);
+    const events = await eventsForTrackingOrCorrelation(resolvedId);
     const notifiable = events
       .filter((e) => e.event_type === "DecisionFinalized" || e.event_type === "InfoRequested")
       .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
