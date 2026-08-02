@@ -17,10 +17,10 @@ describe("index bootstrap", () => {
     const fakeApp = { listen };
     const buildApp = vi.fn().mockReturnValue(fakeApp);
     const createProvider = vi.fn().mockResolvedValue({ recommend: vi.fn() });
-    const loadPolicyContext = vi.fn().mockReturnValue("policy text");
+    const getRelevantPolicyContext = vi.fn().mockReturnValue("policy text");
     vi.doMock("../src/app", () => ({ buildApp }));
     vi.doMock("../src/providerFactory", () => ({ createProvider }));
-    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext }));
+    vi.doMock("../src/policy/configStore", () => ({ getRelevantPolicyContext }));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await import("../src/index");
@@ -29,7 +29,7 @@ describe("index bootstrap", () => {
     expect(createProvider).toHaveBeenCalledWith("stub");
     // index.ts passes the loader itself (not its result) so a policy.md edit is
     // picked up on the next request, not just at process startup (F7).
-    expect(buildApp).toHaveBeenCalledWith(expect.any(Object), loadPolicyContext);
+    expect(buildApp).toHaveBeenCalledWith(expect.any(Object), getRelevantPolicyContext);
     expect(listen).toHaveBeenCalledWith(3002, expect.any(Function));
     expect(logSpy).toHaveBeenCalledWith("decision-service listening on port 3002 (LLM_PROVIDER=stub)");
   });
@@ -41,7 +41,7 @@ describe("index bootstrap", () => {
     const createProvider = vi.fn().mockResolvedValue({ recommend: vi.fn() });
     vi.doMock("../src/app", () => ({ buildApp: vi.fn().mockReturnValue({ listen }) }));
     vi.doMock("../src/providerFactory", () => ({ createProvider }));
-    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext: vi.fn() }));
+    vi.doMock("../src/policy/configStore", () => ({ getRelevantPolicyContext: vi.fn() }));
     vi.spyOn(console, "log").mockImplementation(() => {});
 
     await import("../src/index");
@@ -56,7 +56,7 @@ describe("index bootstrap", () => {
     const listen = vi.fn((_port: number, cb?: () => void) => cb?.());
     vi.doMock("../src/app", () => ({ buildApp: vi.fn().mockReturnValue({ listen }) }));
     vi.doMock("../src/providerFactory", () => ({ createProvider: vi.fn().mockResolvedValue({ recommend: vi.fn() }) }));
-    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext: vi.fn() }));
+    vi.doMock("../src/policy/configStore", () => ({ getRelevantPolicyContext: vi.fn() }));
     vi.spyOn(console, "log").mockImplementation(() => {});
 
     await import("../src/index");
@@ -72,7 +72,7 @@ describe("index bootstrap", () => {
       createProvider: vi.fn().mockRejectedValue(new Error("secret store unreachable")),
     }));
     vi.doMock("../src/app", () => ({ buildApp: vi.fn() }));
-    vi.doMock("../src/policy/configStore", () => ({ loadPolicyContext: vi.fn() }));
+    vi.doMock("../src/policy/configStore", () => ({ getRelevantPolicyContext: vi.fn() }));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
 
