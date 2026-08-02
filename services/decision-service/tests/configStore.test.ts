@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadFxRates, loadThresholds } from "../src/policy/configStore";
+import { loadFxRates, loadThresholds, loadPolicyContext, getRelevantPolicyContext } from "../src/policy/configStore";
 import { DEFAULT_THRESHOLDS, type AutonomyThresholds } from "../src/policy/thresholds";
 import { FALLBACK_FX_RATES } from "../src/policy/fx";
 
@@ -111,5 +111,14 @@ describe("loadPolicyContext", () => {
     expect(loadPolicyContext()).toBe("v2");
     expect(readFileSync).toHaveBeenCalledTimes(2);
     expect(readFileSync).toHaveBeenCalledWith(expect.stringContaining("policy.md"), "utf-8");
+  });
+});
+
+describe("getRelevantPolicyContext", () => {
+  it("returns meaningfully less text than the full policy for a known category", () => {
+    const context = getRelevantPolicyContext({ category: "meals" } as never);
+    expect(context).toContain("MEAL-01");
+    expect(context).not.toContain("TRAVEL-01");
+    expect(context.length).toBeLessThan(loadPolicyContext().length);
   });
 });

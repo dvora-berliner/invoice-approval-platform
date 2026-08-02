@@ -2,6 +2,8 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { DEFAULT_THRESHOLDS, type AutonomyThresholds } from "./thresholds";
 import { FALLBACK_FX_RATES, type FxRates } from "./fx";
+import { parsePolicyChunks, selectRelevantChunks, formatChunks } from "./retriever";
+import type { InvoiceForDecision } from "../types";
 
 const DAPR_HTTP_PORT = process.env.DAPR_HTTP_PORT ?? "3500";
 const CONFIG_STORE = "policy-configuration";
@@ -40,6 +42,12 @@ export async function loadThresholds(): Promise<AutonomyThresholds> {
 // container - takes effect on the next request with no rebuild/redeploy.
 export function loadPolicyContext(): string {
   return readFileSync(join(__dirname, "../../../../policy.md"), "utf-8");
+}
+
+// N5: retrieve only the relevant clause(s), re-parsed fresh each call (consistent with F7).
+export function getRelevantPolicyContext(invoice: InvoiceForDecision): string {
+  const chunks = parsePolicyChunks(loadPolicyContext());
+  return formatChunks(selectRelevantChunks(chunks, invoice));
 }
 
 export async function loadFxRates(): Promise<FxRates> {
