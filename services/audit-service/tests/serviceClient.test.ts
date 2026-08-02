@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { pushInvoiceStatus } from "../src/serviceClient";
+import { pushInvoiceStatus, resolveTrackingId } from "../src/serviceClient";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -27,5 +27,29 @@ describe("pushInvoiceStatus", () => {
     await expect(pushInvoiceStatus("t1", "corr-1", "paid", "all good")).rejects.toThrow(
       /failed to push status to submission-service: 404/,
     );
+  });
+});
+
+describe("resolveTrackingId", () => {
+  it("resolves a pretty id to its tracking id via submission-service", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ trackingId: "t1" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resolveTrackingId("INV-2026-0001")).resolves.toBe("t1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/invoke/submission-service/method/invoices/INV-2026-0001/status"),
+    );
+  });
+
+  it("falls back to the input unchanged when submission-service doesn't recognize it", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    await expect(resolveTrackingId("c1")).resolves.toBe("c1");
+  });
+
+  it("falls back to the input unchanged when submission-service is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    await expect(resolveTrackingId("c1")).resolves.toBe("c1");
   });
 });
