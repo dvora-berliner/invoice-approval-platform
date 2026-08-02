@@ -7,10 +7,12 @@ import { DashboardOverview } from "./DashboardOverview/DashboardOverview";
 import { CeilingProofPanel } from "./CeilingProofPanel/CeilingProofPanel";
 import { TrailLookup } from "./TrailLookup/TrailLookup";
 import { NotificationsLookup } from "./NotificationsLookup/NotificationsLookup";
+import { AllInvoices } from "./AllInvoices/AllInvoices";
 import styles from "./ControllerDashboard.module.css";
 
 const PANELS = [
   { label: "Overview", render: () => <DashboardOverview /> },
+  { label: "All invoices", render: () => <AllInvoices /> },
   { label: "Ceiling proof", render: () => <CeilingProofPanel /> },
   { label: "Decision trail", render: () => <TrailLookup /> },
   { label: "Notifications", render: () => <NotificationsLookup /> },

@@ -9,6 +9,7 @@ vi.mock("../../src/api/client", async () => {
     ...actual,
     api: {
       getDashboard: vi.fn(),
+      getAllInvoices: vi.fn().mockResolvedValue({ items: [] }),
       getCeilingProof: vi.fn(),
       getTrail: vi.fn(),
       getNotifications: vi.fn(),
@@ -27,10 +28,13 @@ beforeEach(() => {
   getDashboardMock.mockResolvedValue({
     totalSubmitted: 1,
     totalEscalated: 0,
+    pendingHumanReview: 0,
     totalFinalized: 1,
     autoApproved: { count: 1, usdAmount: 100 },
     humanApproved: { count: 0, usdAmount: 0 },
-    rejected: 0,
+    paymentFailed: { count: 0, usdAmount: 0 },
+    autoRejected: 0,
+    humanRejected: 0,
     submittedByDay: {},
     finalizedByDay: {},
   });
@@ -42,6 +46,16 @@ describe("ControllerDashboard", () => {
     renderWithTheme(<ControllerDashboard />);
     await waitFor(() => expect(getDashboardMock).toHaveBeenCalled());
     expect(screen.getByText("Submitted")).toBeInTheDocument();
+  });
+
+  it("switches to the all invoices panel", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ControllerDashboard />);
+    await waitFor(() => expect(getDashboardMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("tab", { name: "All invoices" }));
+
+    expect(await screen.findByText("No invoices submitted yet.")).toBeInTheDocument();
   });
 
   it("switches to the ceiling proof panel", async () => {
