@@ -25,6 +25,21 @@ jobs:
 
       - run: npm test
 
+  integration-tests:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: cp secrets.json.example secrets.json
+
+      - run: docker compose up -d --build --wait audit-service audit-service-dapr
+
+      - run: npm run test:integration
+
+      - if: always()
+        run: docker compose down
+
   # N2: once the quality gates above pass, build + publish every service's image -
   # no manual release step. Only for main/dev, not every feature branch push.
   publish-images:
