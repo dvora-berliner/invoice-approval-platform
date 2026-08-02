@@ -4,9 +4,11 @@ import { initPool, ensureSchema } from "./db";
 const port = process.env.PORT ? Number(process.env.PORT) : 3005;
 const daprHttpPort = process.env.DAPR_HTTP_PORT ? Number(process.env.DAPR_HTTP_PORT) : 3500;
 
-// The Dapr sidecar can take a few seconds to bind its HTTP port after this
-// process starts, so a cold-start secret fetch retries instead of failing once.
-async function getSecret(name: string, retries = 10, delayMs = 1000): Promise<string> {
+// The Dapr sidecar can take a while to bind its HTTP port after this process
+// starts (placement handshake included) - especially on a cold CI runner with
+// no image cache - so a cold-start secret fetch retries for up to 30s instead
+// of failing once.
+async function getSecret(name: string, retries = 30, delayMs = 1000): Promise<string> {
   for (let attempt = 1; ; attempt++) {
     try {
       const res = await fetch(`http://localhost:${daprHttpPort}/v1.0/secrets/local-secrets/${name}`);
