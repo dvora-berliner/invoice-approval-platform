@@ -236,12 +236,22 @@ prove the ceiling still holds (M12's requirement).
 |---|---|
 | N3 | Outbox (§5); resiliency-policy YAML (§2) |
 | N4 | Correlation id propagation (§10) |
-| N5 | `decision-service`'s `getRelevantPolicyContext(invoice)` |
 | B1 | D5 verification runner over `sample-invoices.json` |
 | B2 | Agent tool functions (`fetch_policy`, `lookup_vendor`) |
 | N2, B3, N6 | No hook needed (purely additive / ongoing practice) |
 
 Rationale for why each of these is low-cost to add later: see ADR.
+
+---
+
+## 8a. RAG over the policy document (N5)
+
+`decision-service/src/policy/retriever.ts` parses `policy.md` into one chunk
+per `rule_id` (`parsePolicyChunks`), and `getRelevantPolicyContext(invoice)`
+(`configStore.ts`) retrieves only the invoice's category section plus the
+always-applicable `GLOBAL-*` rules (`selectRelevantChunks`) instead of the
+whole document. An unrecognized/missing category falls back to every chunk -
+retrieval never drops a rule it hasn't confidently matched. See ADR-0013.
 
 ---
 

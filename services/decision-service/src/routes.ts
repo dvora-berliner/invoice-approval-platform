@@ -3,10 +3,13 @@ import { convertToUsd } from "./policy/fx";
 import { computeDeterministicViolations } from "./policy/rules";
 import { decideRoute, mergeViolations } from "./policy/router";
 import { loadThresholds, loadFxRates } from "./policy/configStore";
-import { invoiceForDecisionSchema } from "./types";
+import { invoiceForDecisionSchema, type InvoiceForDecision } from "./types";
 import type { LLMProvider } from "./llm/provider";
 
-export function createDecisionRouter(provider: LLMProvider, loadPolicyContext: () => string): Router {
+export function createDecisionRouter(
+  provider: LLMProvider,
+  getRelevantPolicyContext: (invoice: InvoiceForDecision) => string,
+): Router {
   const router = Router();
 
   router.post("/decide", async (req, res) => {
@@ -30,7 +33,7 @@ export function createDecisionRouter(provider: LLMProvider, loadPolicyContext: (
 
     try {
       const thresholds = await loadThresholds();
-      const policyContext = loadPolicyContext();
+      const policyContext = getRelevantPolicyContext(invoice);
 
       // A provider failure/timeout never defaults to approval - it forces human_review.
       const agentRecommendation = await provider.recommend(invoice, usdAmount, policyContext).catch((err) => {
